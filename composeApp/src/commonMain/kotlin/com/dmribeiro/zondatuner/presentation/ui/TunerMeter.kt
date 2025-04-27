@@ -4,7 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.Text
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,23 +22,37 @@ fun TunerMeter(
     targetFrequency: Float,
     note: String
 ) {
-    val tolerance = 2 // 🔹 Define um intervalo de tolerância (±2 Hz)
+    val tolerance = 3 // 🔹 Define um intervalo de tolerância (±2 Hz)
 
-    // 🔹 Converte valores para `Int` para exibição e comparação
-    val detectedInt = detectedFrequency.roundToInt()
+    // 🔹 Buffer de frequências detectadas para suavização
+    val frequencyBuffer = remember { mutableStateListOf<Float>() }
+
+    // 🔹 Atualiza o buffer
+    LaunchedEffect(detectedFrequency) {
+        if (frequencyBuffer.size > 5) { // 🔹 Mantém as últimas 5 medições
+            frequencyBuffer.removeFirst()
+        }
+        frequencyBuffer.add(detectedFrequency)
+    }
+
+    // 🔹 Faz a média das últimas leituras
+// 🔹 Faz a média das últimas leituras, mas evita NaN
+    val smoothedFrequency = if (frequencyBuffer.isNotEmpty()) {
+        frequencyBuffer.average().toFloat()
+    } else {
+        0f // Ou targetFrequency, ou detectedFrequency, como quiser
+    }
+    val detectedInt = smoothedFrequency.roundToInt()
     val targetInt = targetFrequency.roundToInt()
 
-    // 🔹 Considera afinado se a frequência detectada estiver dentro da tolerância
     val isTuned = detectedInt in (targetInt - tolerance)..(targetInt + tolerance)
 
-    // 🔹 Define a cor e o ícone baseado no estado de afinação
     val tuningIcon = if (isTuned) "✅" else "☑️"
     val tuningColor by animateColorAsState(
         targetValue = if (isTuned) Color(0xFF4CAF50) else Color.Gray,
         animationSpec = tween(durationMillis = 200)
     )
 
-    // 🔹 Ajuste da posição da bolinha no medidor
     val frequencyOffset = detectedInt - targetInt
     val rawPosition = ((frequencyOffset / (targetInt * 0.1f)) * 180f)
     val ballPosition by animateFloatAsState(
@@ -46,11 +60,11 @@ fun TunerMeter(
         animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
     )
 
+    // (o resto do seu código permanece igual a partir daqui)
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 🔹 Exibe a nota e a frequência alvo
         Text(
             text = "$note - $targetInt Hz",
             fontSize = 22.sp,
@@ -60,7 +74,6 @@ fun TunerMeter(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 🔹 Indicação visual para apertar ou afrouxar a corda
         Row(
             modifier = Modifier.fillMaxWidth(0.85f),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -74,7 +87,6 @@ fun TunerMeter(
             Text(" $loosenIcon Afrouxe", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = loosenColor)
         }
 
-        // 🔹 Medidor com a bolinha indicadora
         Canvas(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
@@ -83,7 +95,6 @@ fun TunerMeter(
             val width = size.width
             val height = size.height
 
-            // 🔹 Barra principal
             drawLine(
                 color = Color.Black,
                 start = Offset(0f, height / 2),
@@ -92,7 +103,6 @@ fun TunerMeter(
                 cap = StrokeCap.Round
             )
 
-            // 🔹 Indicador central verde para afinação correta
             drawLine(
                 color = Color(0xFF4CAF50),
                 start = Offset(width / 2 - 10f, height / 2),
@@ -101,7 +111,6 @@ fun TunerMeter(
                 cap = StrokeCap.Round
             )
 
-            // 🔹 Desenha a bolinha indicadora
             val ballX = width / 2 + ballPosition
             drawCircle(
                 color = Color(0xFFFF5722),
@@ -112,7 +121,6 @@ fun TunerMeter(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 🔹 Exibe o status "Afinado!" com o ícone correspondente
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {

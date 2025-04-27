@@ -73,21 +73,32 @@ fun TunerScreenWithAudio(
     tuning: TuningDataUi,
     viewModel: HomeScreenModel = koinInject()
 ) {
+    // ------------------------------------------------------------------
+    // 1. Frequência bruta que vem do MicrophoneCapture
+    // ------------------------------------------------------------------
     var detectedFrequency by remember { mutableStateOf(0f) }
-    var selectedStringIndex by remember { mutableStateOf(6) } // 🔹 Começa corretamente na 6ª corda
-    var showDeleteDialog by remember { mutableStateOf(false) }
 
-    // 🔹 Busca a corda correta com base no número e não no índice
-    val selectedString = tuning.getGuitarStrings().find { it.number == selectedStringIndex }
+    // 🔵 NOVO  : buffer circular para suavizar
+    val freqBuffer = remember { mutableStateListOf<Float>() }
+
+    // ------------------------------------------------------------------
+    // 2. Cordas / nota alvo (seu código original)
+    // ------------------------------------------------------------------
+    var selectedStringIndex by remember { mutableStateOf(6) }
+    var showDeleteDialog   by remember { mutableStateOf(false) }
+
+    val selectedString = tuning.getGuitarStrings()
+        .find { it.number == selectedStringIndex }
         ?: tuning.getGuitarStrings().first()
 
     val targetFrequency = selectedString.frequency
-    val targetNote = selectedString.note
+    val targetNote      = selectedString.note
 
+    // ------------------------------------------------------------------
+    // 3. Captura de áudio  (inalterado)
+    // ------------------------------------------------------------------
     val audioProcessor = remember {
-        MicrophoneCapture { frequency ->
-            detectedFrequency = frequency
-        }
+        MicrophoneCapture { freq -> detectedFrequency = freq }   // ← bruto
     }
 
     DisposableEffect(Unit) {
@@ -95,50 +106,62 @@ fun TunerScreenWithAudio(
         onDispose { audioProcessor.stop() }
     }
 
-    // 🔹 Permite rolar a tela caso os itens não caibam na tela do dispositivo
+    // ------------------------------------------------------------------
+    // 4. ATUALIZA BUFFER  (executa sempre que chegar um valor novo)
+    // ------------------------------------------------------------------
+    LaunchedEffect(detectedFrequency) {
+        if (detectedFrequency > 0) {           // ignora zeros
+            if (freqBuffer.size >= 5) freqBuffer.removeFirst()
+            freqBuffer.add(detectedFrequency)
+        }
+    }
+
+    // 🔵 NOVO : frequência SUAVIZADA
+    val smoothFrequency =
+        if (freqBuffer.isNotEmpty()) freqBuffer.average().toFloat() else 0f
+    // ------------------------------------------------------------------
+
+    /* --------------------------- UI ------------------------------- */
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Gray300) // ✅ Agora o fundo se adapta corretamente ao tema escuro
-            .padding(top = 0.dp, end = 16.dp, bottom = 16.dp, start = 16.dp),
+            .background(Gray300)
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // 🔹 Exibe as cordas e permite a seleção correta
         GuitarStringsSelector(
             tuning = tuning,
             onStringSelected = { selectedStringIndex = it }
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // 🔹 Exibe o medidor com a nota correta
+        /* ---------- usa smoothFrequency em vez de detectedFrequency ---- */
         TunerMeter(
-            detectedFrequency = detectedFrequency,
-            targetFrequency = targetFrequency,
-            note = targetNote
+            detectedFrequency = smoothFrequency,
+            targetFrequency   = targetFrequency,
+            note              = targetNote
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
 
-        // 🔹 Mantém "Frequência Detectada" estático e altera apenas o valor dinâmico
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Frequência Detectada: ",
-                fontSize = 16.sp,
+                text       = "Frequência Detectada:",
+                fontSize   = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White // ✅ Agora o texto se adapta ao tema escuro
+                color      = Color.White
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(Modifier.width(4.dp))
             Text(
-                text = "${detectedFrequency.roundToInt()} Hz",
-                fontSize = 16.sp,
+                text       = "${smoothFrequency.roundToInt()} Hz",   // aqui tb
+                fontSize   = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Cyan // ✅ Mantém destaque
+                color      = Color.Cyan
             )
         }
+
 
         Spacer(modifier = Modifier.height(16.dp))
 

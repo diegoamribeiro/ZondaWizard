@@ -8,7 +8,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
-    alias(libs.plugins.swiftklib)
+//    alias(libs.plugins.swiftklib)
 }
 
 kotlin {
@@ -32,13 +32,13 @@ kotlin {
             isStatic = true
             linkerOpts.add("-lsqlite3")
         }
-        iosTarget.compilations {
-            val main by getting {
-                cinterops{
-                    create("AudioHelper")
-                }
-            }
-        }
+//        iosTarget.compilations {
+//            val main by getting {
+//                cinterops{
+//                    create("AudioHelper")
+//                }
+//            }
+//        }
     }
 
     sourceSets {
@@ -52,7 +52,7 @@ kotlin {
             implementation(libs.koin.core)
             implementation("com.google.accompanist:accompanist-permissions:0.37.2")
             //noinspection GradlePath
-            implementation(files("/Users/diegoribeiro/StudioProjects/ZondaTuner/composeApp/src/androidMain/libs/TarsosDSP.jar"))
+            implementation(files("/Users/diegoribeiro/AndroidStudioProjects/ZondaWizard/composeApp/src/commonMain/libs/TarsosDSP-Android-latest.jar"))
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -136,11 +136,11 @@ dependencies {
     debugImplementation(compose.uiTooling)
     ksp(libs.room.compiler)
 }
-
-swiftklib{
-    create("AudioHelper"){
-        path = file("../iosApp/iosApp/AudioHelper")
-        packageName = "com.dmribeiro.AudioHelper"
-    }
-}
+//
+//swiftklib{
+//    create("AudioHelper"){
+//        path = file("../iosApp/iosApp/AudioHelper")
+//        packageName = "com.dmribeiro.AudioHelper"
+//    }
+//}
 

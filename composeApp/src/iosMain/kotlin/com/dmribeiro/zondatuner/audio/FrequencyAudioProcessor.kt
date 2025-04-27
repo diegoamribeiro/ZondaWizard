@@ -4,121 +4,142 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.get
 import platform.AVFAudio.*
 import platform.CoreAudioTypes.kLinearPCMFormatFlagIsFloat
-import platform.Foundation.NSLog
 import kotlin.math.*
 
 actual class FrequencyAudioProcessor actual constructor(
     private val onFrequencyDetected: (Float) -> Unit
 ) {
-
     private var audioEngine: AVAudioEngine? = null
-    private var inputNode: AVAudioInputNode? = null
+    private var inputNode : AVAudioInputNode? = null
     private var audioFormat: AVAudioFormat? = null
     private val bus: AVAudioNodeBus = 0u
 
-    private val frequencyBuffer = mutableListOf<Float>() // 🔹 Buffer para suavização dos dados
+    private val frequencyBuffer = mutableListOf<Float>()
 
+    /* ---------- sessão de áudio com latência baixa ---------- */
+    @OptIn(ExperimentalForeignApi::class)
+    private fun configureSession() {
+        val s = AVAudioSession.sharedInstance()
+
+        s.setCategory(
+            category    = AVAudioSessionCategoryPlayAndRecord,
+            withOptions = AVAudioSessionCategoryOptionAllowBluetooth,
+            error       = null
+        )
+        s.setPreferredSampleRate(SAMPLE_RATE.toDouble(),           error = null)
+        s.setPreferredIOBufferDuration(IO_BUFFER_MS,               error = null)
+        s.setActive(true,                                          error = null)
+    }
+
+    /* ---------- iniciar captura ---------- */
     @OptIn(ExperimentalForeignApi::class)
     actual fun start() {
-        try {
-            audioEngine = AVAudioEngine()
-            inputNode = audioEngine?.inputNode
+        configureSession()
 
-            // Configura um formato de áudio válido manualmente
-            audioFormat = AVAudioFormat(
-                commonFormat = kLinearPCMFormatFlagIsFloat.toULong(),
-                sampleRate = SAMPLE_RATE.toDouble(),
-                channels = 1u,
-                interleaved = false
-            )
-            if (inputNode == null || audioFormat == null) {
-                NSLog("❌ Erro: inputNode ou audioFormat está nulo!")
-                return
-            }
+        audioEngine = AVAudioEngine()
+        inputNode   = audioEngine?.inputNode
 
-            // 🔹 Adiciona um Tap no inputNode para capturar áudio
-            inputNode?.installTapOnBus(bus, bufferSize = BUFFER_SIZE.toUInt(), format = audioFormat) { buffer, _ ->
-                processAudioBuffer(buffer)
-            }
+        // formato linear-PCM 32-bit float, mono, 44 100 Hz
+        audioFormat = AVAudioFormat(
+            commonFormat = kLinearPCMFormatFlagIsFloat.toULong(),
+            sampleRate   = SAMPLE_RATE.toDouble(),
+            channels     = 1u,
+            interleaved  = false
+        )
 
-            NSLog("🔹 Iniciando processamento de áudio no iOS...")
-            audioEngine?.prepare()
-            try {
-                audioEngine?.startAndReturnError(null)
-                NSLog("✅ AudioEngine iniciado com sucesso!")
-            } catch (e: Exception) {
-                NSLog("❌ Erro ao iniciar o AudioEngine: ${e.message}")
-            }
-        } catch (e: Exception) {
-            NSLog("❌ Erro ao configurar o AVAudioEngine: ${e.message}")
-        }
+        // bufferSize = 2048 → 46 ms (@44 100 Hz) – bom p/ autocorrelação
+        inputNode?.installTapOnBus(
+            bus,
+            bufferSize = BUFFER_SIZE.toUInt(),
+            format     = audioFormat
+        ) { buffer, _ -> processAudioBuffer(buffer) }
+
+        audioEngine?.prepare()
+        audioEngine?.startAndReturnError(null)
     }
 
     actual fun stop() {
         inputNode?.removeTapOnBus(bus)
         audioEngine?.stop()
-        NSLog("🛑 AudioEngine parado!")
     }
 
+    /* ---------- processamento FFT/autocorrelação ---------- */
     @OptIn(ExperimentalForeignApi::class)
     private fun processAudioBuffer(buffer: AVAudioPCMBuffer?) {
         buffer ?: return
         val channelData = buffer.floatChannelData ?: return
-        val frameLength = buffer.frameLength.toInt()
+        val frameLength = buffer.frameLength.toInt()          // **NÃO** cortar!
 
         val samples = FloatArray(frameLength) { i ->
-            channelData[0]?.get(i) ?: 0.0f
+            channelData[0]!!.get(i)
         }
 
-        // 🔹 Calcula a frequência dominante
-        val detectedFrequency = detectPitch(samples, SAMPLE_RATE)
-
-        // 🔹 Filtro de ruído - ignora frequências irreais
-        if (detectedFrequency < 20 || detectedFrequency > 5000) return
-
-        // 🔹 Aplica suavização com média móvel para evitar jitter
-        val smoothedFrequency = smoothFrequency(detectedFrequency)
-        println("📡 Frequência Detectada: $detectedFrequency Hz")
-
-        // 🔹 Somente envia se houver uma frequência válida
-        if (smoothedFrequency > 0) {
-            NSLog("🎵 Frequência suavizada detectada: ${smoothedFrequency} Hz")
-            onFrequencyDetected(smoothedFrequency)
+        val freq = detectPitch(samples, SAMPLE_RATE)
+        if (freq in 20f..5_000f) {
+            val smooth = smoothFrequency(freq)
+            onFrequencyDetected(smooth)
         }
     }
 
+    /* ---------- autocorrelação com interpolação parabólica ---------- */
+    /* ------------- autocorrelação + interpolação segura ------------- */
     private fun detectPitch(samples: FloatArray, sampleRate: Int): Float {
-        var maxIndex = 0
-        var maxAmplitude = 0f
 
-        for (i in samples.indices) {
-            val amplitude = abs(samples[i])
-            if (amplitude > maxAmplitude) {
-                maxAmplitude = amplitude
-                maxIndex = i
+        val minFreq = 60
+        val maxFreq = 1_000
+        val minLag  = sampleRate / maxFreq        // 44
+        val maxLag  = sampleRate / minFreq        // 735
+        val size    = samples.size
+        if (size < maxLag + 2) return 0f
+
+        // remove DC
+        val mean = samples.average().toFloat()
+        for (i in samples.indices) samples[i] -= mean
+
+        var bestLag  = -1
+        var bestCorr = 0f
+        val corr = FloatArray(maxLag + 3)         // +3 evita estouro (+1 e -1)
+
+        /* --------- correlação direta (não normalizada) --------- */
+        for (lag in minLag..maxLag) {
+            var sum = 0f
+            var j   = 0
+            while (j < size - lag) {
+                sum += samples[j] * samples[j + lag]
+                j++
+            }
+            corr[lag] = sum
+            if (sum > bestCorr) {
+                bestCorr = sum
+                bestLag  = lag
             }
         }
 
-        return if (maxAmplitude > 0.01f) { // 🔹 Filtro básico de ruído
-            sampleRate.toFloat() / maxIndex.toFloat()
-        } else {
-            0f
-        }
+        if (bestLag <= 0 || bestCorr < 0.01f) return 0f
+
+        /* --------- interpolação parabólica – proteção nas bordas --------- */
+        val r1 = if (bestLag > 0)       corr[bestLag - 1] else corr[bestLag]
+        val r2 =                         corr[bestLag]
+        val r3 = if (bestLag < maxLag) corr[bestLag + 1] else corr[bestLag]
+
+        val denom = 2f * r2 - r1 - r3            // pode ser 0
+        val delta = if (denom == 0f) 0f else (r1 - r3) / denom   // –0.5…+0.5
+
+        val refinedLag = bestLag + delta
+        return sampleRate.toFloat() / refinedLag
     }
 
-    private fun smoothFrequency(frequency: Float): Float {
-        // 🔹 Mantém um histórico das últimas 5 medições
-        if (frequencyBuffer.size >= 5) {
-            frequencyBuffer.removeAt(0)
-        }
-        frequencyBuffer.add(frequency)
-
-        // 🔹 Calcula a média das últimas medições
+    /* ---------- média móvel p/ suavizar ---------- */
+    private fun smoothFrequency(f: Float): Float {
+        if (frequencyBuffer.size >= SMOOTH_WINDOW) frequencyBuffer.removeAt(0)
+        frequencyBuffer.add(f)
         return frequencyBuffer.average().toFloat()
     }
 
     companion object {
-        private const val SAMPLE_RATE = 44100
-        private const val BUFFER_SIZE = 2048
+        private const val SAMPLE_RATE  = 44_100          // Hz
+        private const val BUFFER_SIZE  = 2_048           // amostras
+        private const val IO_BUFFER_MS = 0.008           // 8 ms
+        private const val SMOOTH_WINDOW = 3
     }
 }
