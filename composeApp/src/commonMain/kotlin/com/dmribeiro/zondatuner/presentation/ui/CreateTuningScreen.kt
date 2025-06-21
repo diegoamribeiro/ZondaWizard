@@ -2,7 +2,9 @@ package com.dmribeiro.zondatuner.presentation.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,43 +36,54 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dmribeiro.zondatuner.domain.model.GuitarString
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
-import com.dmribeiro.zondatuner.presentation.viewmodel.HomeScreenModel
+import com.dmribeiro.zondatuner.utils.dismissKeyboardLambda
 import com.dmribeiro.zondatuner.utils.formatFrequency
-import org.koin.compose.koinInject
 import kotlin.math.pow
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 
 @Composable
 fun CreateTuningScreenContent(
-    existingTuning: TuningDataUi? = null, // 🔹 Se for null, criamos uma nova afinação
+    existingTuning: TuningDataUi? = null,
     onBack: () -> Unit,
     onSave: (TuningDataUi) -> Unit
 ) {
+    var name by remember { mutableStateOf(existingTuning?.name ?: "") }
+    var description by remember { mutableStateOf(existingTuning?.description ?: "") }
 
-    var name by remember { mutableStateOf(existingTuning?.name) }
-    var description by remember { mutableStateOf(existingTuning?.description) }
-    var stringNotes by remember { mutableStateOf(existingTuning?.strings?.map { it.note } ?: listOf("E", "A", "D", "G", "B", "E")) }
-    var octaveShifts by remember { mutableStateOf(existingTuning?.strings?.map { 0 } ?: List(6) { 0 }) }
+    var stringsState by remember {
+        mutableStateOf(
+            existingTuning?.strings?.map { it.copy() } ?: defaultStrings()
+        )
+    }
 
     val notes = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+    val dismissKeyboard = dismissKeyboardLambda()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) {
+                dismissKeyboard()
+            }
             .padding(16.dp)
     ) {
         Text(if (existingTuning == null) "Criar Nova Afinação" else "Editar Afinação", style = MaterialTheme.typography.h5)
-
         Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedTextField(
-            value = name ?: "",
+            value = name,
             onValueChange = { name = it },
             label = { Text("Nome da Afinação") },
             modifier = Modifier.fillMaxWidth()
         )
 
         OutlinedTextField(
-            value = description ?: "",
+            value = description,
             onValueChange = { description = it },
             label = { Text("Descrição (Opcional)") },
             modifier = Modifier.fillMaxWidth()
@@ -83,17 +96,28 @@ fun CreateTuningScreenContent(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             items(6) { index ->
+                val guitarString = stringsState[index]
                 TuningStringRow(
-                    stringNumber = 6 - index,
-                    selectedNote = stringNotes[index],
-                    octaveShift = octaveShifts[index],
-                    frequency = noteToFrequency(stringNotes[index], 6 - index, octaveShifts[index]),
+                    stringNumber = guitarString.number,
+                    selectedNote = guitarString.note,
+                    octaveShift = guitarString.octaveShift,
+                    frequency = guitarString.frequency,
                     notes = notes,
                     onNoteChange = { newNote ->
-                        stringNotes = stringNotes.toMutableList().apply { set(index, newNote) }
+                        stringsState = stringsState.toMutableList().apply {
+                            set(index, get(index).copy(
+                                note = newNote,
+                                frequency = noteToFrequency(newNote, guitarString.number, get(index).octaveShift)
+                            ))
+                        }
                     },
-                    onOctaveChange = { shift ->
-                        octaveShifts = octaveShifts.toMutableList().apply { set(index, shift) }
+                    onOctaveChange = { newShift ->
+                        stringsState = stringsState.toMutableList().apply {
+                            set(index, get(index).copy(
+                                octaveShift = newShift,
+                                frequency = noteToFrequency(get(index).note, guitarString.number, newShift)
+                            ))
+                        }
                     }
                 )
             }
@@ -113,17 +137,11 @@ fun CreateTuningScreenContent(
                 onClick = {
                     val newTuning = TuningDataUi(
                         id = existingTuning?.id ?: 0,
-                        name = name ?: "No name",
-                        description = description ?: "No description",
-                        strings = stringNotes.mapIndexed { index, note ->
-                            GuitarString(
-                                number = 6 - index,
-                                frequency = noteToFrequency(note, 6 - index, octaveShifts[index]),
-                                note = note
-                            )
-                        }
+                        name = name,
+                        description = description,
+                        strings = stringsState
                     )
-                    onSave(newTuning) // 🔹 Chama a ação correta (criação ou edição)
+                    onSave(newTuning)
                     onBack()
                 }
             ) {
@@ -132,6 +150,15 @@ fun CreateTuningScreenContent(
         }
     }
 }
+
+fun defaultStrings(): List<GuitarString> = listOf(
+    GuitarString(6, 82.41f, "E", 0),
+    GuitarString(5, 110.00f, "A", 0),
+    GuitarString(4, 146.83f, "D", 0),
+    GuitarString(3, 196.00f, "G", 0),
+    GuitarString(2, 246.94f, "B", 0),
+    GuitarString(1, 329.63f, "E", 0)
+)
 
 // 🔹 Componente otimizado para cada corda
 @Composable

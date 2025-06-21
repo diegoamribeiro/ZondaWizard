@@ -11,6 +11,13 @@ import kotlin.coroutines.coroutineContext
 
 
 actual class PermissionHandler(private val context: Context) {
+    actual fun hasAudioPermission(onResult: (Boolean) -> Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        onResult(granted)
+    }
+
     actual fun requestAudioPermission(onResult: (Boolean) -> Unit) {
         val activity = context as? Activity ?: return
 
@@ -19,7 +26,11 @@ actual class PermissionHandler(private val context: Context) {
         ) {
             onResult(true)
         } else {
-            ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), 100)
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                100
+            )
             onResult(false)
         }
     }

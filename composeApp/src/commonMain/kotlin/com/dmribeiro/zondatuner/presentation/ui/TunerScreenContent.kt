@@ -1,26 +1,39 @@
 package com.dmribeiro.zondatuner.presentation.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.AlertDialog
+import androidx.compose.material.Button
+import androidx.compose.material.ButtonDefaults
+import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dmribeiro.zondatuner.audio.MicrophoneCapture
-import com.dmribeiro.zondatuner.domain.model.Tuning
 import com.dmribeiro.zondatuner.permissions.getPermissionHandler
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.presentation.viewmodel.HomeScreenModel
-import com.dmribeiro.zondatuner.theme.Gray100
 import com.dmribeiro.zondatuner.theme.Gray300
-import com.dmribeiro.zondatuner.theme.Gray700
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
@@ -30,24 +43,50 @@ fun TunerScreenContent(
     onBack: () -> Unit,
     tuning: TuningDataUi
 ) {
-    var permissionGranted by remember { mutableStateOf(false) }
+    var permissionGranted by remember { mutableStateOf<Boolean?>(null) }
     val permissionHandler = getPermissionHandler()
 
-    // 🔹 Solicita permissão ao iniciar a tela
     LaunchedEffect(Unit) {
-        permissionHandler.requestAudioPermission { granted ->
+        permissionHandler.hasAudioPermission { granted ->
             permissionGranted = granted
+            if (!granted) {
+                permissionHandler.requestAudioPermission { newGranted ->
+                    permissionGranted = newGranted
+                }
+            }
         }
     }
 
-    if (permissionGranted) {
-        TunerScreenWithAudio(onBack, tuning)
-    } else {
-        PermissionRequestScreen(onRequestPermission = {
+    when (permissionGranted) {
+        true -> TunerScreenWithAudio(onBack, tuning)
+        false -> PermissionRequestScreen(onRequestPermission = {
             permissionHandler.requestAudioPermission { granted ->
                 permissionGranted = granted
             }
         })
+
+        null -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Gray300)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator(
+                    color = Color.Cyan,
+                    strokeWidth = 4.dp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Montando afinação...",
+                    fontSize = 16.sp,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
     }
 }
 
@@ -77,6 +116,7 @@ fun TunerScreenWithAudio(
     // 1. Frequência bruta que vem do MicrophoneCapture
     // ------------------------------------------------------------------
     var detectedFrequency by remember { mutableStateOf(0f) }
+    var isTwelfthFretMode by remember { mutableStateOf(false) } // 🔥 Novo estado
 
     // 🔵 NOVO  : buffer circular para suavizar
     val freqBuffer = remember { mutableStateListOf<Float>() }
@@ -84,15 +124,19 @@ fun TunerScreenWithAudio(
     // ------------------------------------------------------------------
     // 2. Cordas / nota alvo (seu código original)
     // ------------------------------------------------------------------
-    var selectedStringIndex by remember { mutableStateOf(6) }
-    var showDeleteDialog   by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
+    var selectedStringIndex by remember { mutableStateOf(6) }
     val selectedString = tuning.getGuitarStrings()
         .find { it.number == selectedStringIndex }
         ?: tuning.getGuitarStrings().first()
 
-    val targetFrequency = selectedString.frequency
-    val targetNote      = selectedString.note
+    val targetFrequency = if (isTwelfthFretMode) {
+        selectedString.frequency * 2
+    } else {
+        selectedString.frequency
+    }
+    val targetNote = selectedString.note
 
     // ------------------------------------------------------------------
     // 3. Captura de áudio  (inalterado)
@@ -126,13 +170,16 @@ fun TunerScreenWithAudio(
         modifier = Modifier
             .fillMaxSize()
             .background(Gray300)
-            .padding(16.dp),
+            .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
         GuitarStringsSelector(
             tuning = tuning,
-            onStringSelected = { selectedStringIndex = it }
+            selectedString = selectedStringIndex,
+            isTwelfthFretMode = isTwelfthFretMode,
+            onStringSelected = { selectedStringIndex = it },
+            onToggleTwelfthFretMode = { isTwelfthFretMode = !isTwelfthFretMode }
         )
 
         Spacer(Modifier.height(10.dp))
@@ -140,25 +187,25 @@ fun TunerScreenWithAudio(
         /* ---------- usa smoothFrequency em vez de detectedFrequency ---- */
         TunerMeter(
             detectedFrequency = smoothFrequency,
-            targetFrequency   = targetFrequency,
-            note              = targetNote
+            targetFrequency = targetFrequency,
+            note = targetNote
         )
 
         Spacer(Modifier.height(16.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text       = "Frequência Detectada:",
-                fontSize   = 16.sp,
+                text = "Frequência Detectada:",
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color      = Color.White
+                color = Color.White
             )
             Spacer(Modifier.width(4.dp))
             Text(
-                text       = "${smoothFrequency.roundToInt()} Hz",   // aqui tb
-                fontSize   = 16.sp,
+                text = "${smoothFrequency.roundToInt()} Hz",   // aqui tb
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color      = Color.Cyan
+                color = Color.Cyan
             )
         }
 

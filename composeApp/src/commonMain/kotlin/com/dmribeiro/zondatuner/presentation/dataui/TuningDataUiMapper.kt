@@ -12,12 +12,12 @@ class TuningDataUiMapper {
             name = entity.name,
             description = entity.description,
             strings = listOf(
-                GuitarString(6, entity.string6Frequency, entity.string6Note),
-                GuitarString(5, entity.string5Frequency, entity.string5Note),
-                GuitarString(4, entity.string4Frequency, entity.string4Note),
-                GuitarString(3, entity.string3Frequency, entity.string3Note),
-                GuitarString(2, entity.string2Frequency, entity.string2Note),
-                GuitarString(1, entity.string1Frequency, entity.string1Note)
+                GuitarString(6, entity.string6Frequency, entity.string6Note, 0),
+                GuitarString(5, entity.string5Frequency, entity.string5Note, 0),
+                GuitarString(4, entity.string4Frequency, entity.string4Note, 0),
+                GuitarString(3, entity.string3Frequency, entity.string3Note, 0),
+                GuitarString(2, entity.string2Frequency, entity.string2Note, 0),
+                GuitarString(1, entity.string1Frequency, entity.string1Note, 0)
             )
         )
     }
@@ -53,7 +53,8 @@ class TuningDataUiMapper {
                 GuitarString(
                     number = guitarString.number,
                     frequency = guitarString.frequency,
-                    note = guitarString.note
+                    note = guitarString.note,
+                    octaveShift = guitarString.octaveShift
                 )
             }
         )
@@ -69,7 +70,8 @@ class TuningDataUiMapper {
                 GuitarString(
                     number = guitarString.number,
                     frequency = guitarString.frequency,
-                    note = guitarString.note
+                    note = guitarString.note,
+                    octaveShift = guitarString.octaveShift
                 )
             }
         )

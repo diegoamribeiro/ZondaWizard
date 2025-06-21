@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class TuningRepositoryImpl(
-
     db: AppDatabase,
     private val mapper: TuningDataUiMapper
 ) : TuningRepository {
@@ -21,16 +20,34 @@ class TuningRepositoryImpl(
         }
     }
 
-    override suspend fun insertTuning(tuning: Tuning) {
-        dao.insertTuning(mapper.toEntity(tuning))
-    }
-
     override suspend fun deleteTuning(id: Long) {
         dao.deleteTuning(id)
     }
 
+    override suspend fun insertTuning(tuning: Tuning) {
+        val entity = mapper.toEntity(tuning).copy(id = 0)
+        dao.insertTuning(entity)
+    }
+
     override suspend fun updateTuning(tuning: Tuning) {
-        dao.updateTuning(tuning.id, tuning.name, tuning.description ?: "No description")
+        val entity = mapper.toEntity(tuning)
+        dao.updateTuning(
+            id = entity.id,
+            name = entity.name,
+            description = entity.description,
+            string6Frequency = entity.string6Frequency,
+            string6Note = entity.string6Note,
+            string5Frequency = entity.string5Frequency,
+            string5Note = entity.string5Note,
+            string4Frequency = entity.string4Frequency,
+            string4Note = entity.string4Note,
+            string3Frequency = entity.string3Frequency,
+            string3Note = entity.string3Note,
+            string2Frequency = entity.string2Frequency,
+            string2Note = entity.string2Note,
+            string1Frequency = entity.string1Frequency,
+            string1Note = entity.string1Note
+        )
     }
 
 }

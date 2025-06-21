@@ -13,6 +13,7 @@ actual class FrequencyAudioProcessor actual constructor(
     private var inputNode : AVAudioInputNode? = null
     private var audioFormat: AVAudioFormat? = null
     private val bus: AVAudioNodeBus = 0u
+    private var currentSampleRate = 44_100
 
     private val frequencyBuffer = mutableListOf<Float>()
 
@@ -34,28 +35,34 @@ actual class FrequencyAudioProcessor actual constructor(
     /* ---------- iniciar captura ---------- */
     @OptIn(ExperimentalForeignApi::class)
     actual fun start() {
-        configureSession()
+
+        configureSession()                        // mantém
 
         audioEngine = AVAudioEngine()
-        inputNode   = audioEngine?.inputNode
+        inputNode   = audioEngine!!.inputNode
 
-        // formato linear-PCM 32-bit float, mono, 44 100 Hz
-        audioFormat = AVAudioFormat(
-            commonFormat = kLinearPCMFormatFlagIsFloat.toULong(),
-            sampleRate   = SAMPLE_RATE.toDouble(),
+        // ► formato REAL que o hardware abriu
+        val hwFormat = inputNode!!.inputFormatForBus(bus)
+        val hwSampleRate = hwFormat.sampleRate.toInt()      // 44 100 ou 48 000
+
+        // ► guarda para usar na autocorrelação
+        currentSampleRate = hwSampleRate
+
+        // ► se quiser forçar Float32, crie novo formato **com o mesmo sample-rate**
+        val tapFormat = AVAudioFormat(
+            commonFormat = AVAudioPCMFormatFloat32.toULong(),
+            sampleRate   = hwFormat.sampleRate,
             channels     = 1u,
             interleaved  = false
         )
-
-        // bufferSize = 2048 → 46 ms (@44 100 Hz) – bom p/ autocorrelação
-        inputNode?.installTapOnBus(
+        inputNode!!.installTapOnBus(
             bus,
             bufferSize = BUFFER_SIZE.toUInt(),
-            format     = audioFormat
+            format     = tapFormat          // ← sample-rate agora coincide
         ) { buffer, _ -> processAudioBuffer(buffer) }
 
-        audioEngine?.prepare()
-        audioEngine?.startAndReturnError(null)
+        audioEngine!!.prepare()
+        audioEngine!!.startAndReturnError(null)
     }
 
     actual fun stop() {
