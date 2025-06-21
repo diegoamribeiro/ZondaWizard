@@ -289,19 +289,14 @@ fun noteToFrequency(note: String, stringNumber: Int, octaveShift: Int = 0): Floa
         1 to "E" to 329.63f
     )
 
-    // 🔹 Pega a frequência base da corda na afinação padrão
-    val standardEntry = standardTuning.entries.find { it.key.first == stringNumber }
-        ?: return 0f
+    val standardEntry = standardTuning.entries.find { it.key.first == stringNumber } ?: return 0f
 
-    val baseNote = standardEntry.key.second // Nota padrão da corda
-    val baseFrequency = standardEntry.value // Frequência padrão da corda
+    val baseNote = standardEntry.key.second
+    val baseFrequency = standardEntry.value
 
-    // 🔹 Calcula a diferença de semitons entre a nova nota e a nota padrão da corda
     val semitoneDifference = baseFrequencies.keys.indexOf(note) - baseFrequencies.keys.indexOf(baseNote)
 
-    // 🔹 Aplica a transformação para mudar a nota
     val adjustedFrequency = baseFrequency * (2.0.pow(semitoneDifference / 12.0)).toFloat()
 
-    // 🔹 Aplica o shift da oitava
     return adjustedFrequency * (2.0.pow(octaveShift)).toFloat()
 }

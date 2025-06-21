@@ -7,5 +7,5 @@ import org.koin.dsl.module
 
 val presentationModule = module {
     factory { TuningDataUiMapper() }
-    factory { HomeScreenModel(get(), get(), get(), get(), get()) }
+    factory { HomeScreenModel(get(), get(), get(), get(), get(), get()) }
 }

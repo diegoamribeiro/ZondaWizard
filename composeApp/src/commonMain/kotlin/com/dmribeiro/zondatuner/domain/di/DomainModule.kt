@@ -4,6 +4,7 @@ import com.dmribeiro.zondatuner.domain.repository.TuningRepository
 import com.dmribeiro.zondatuner.domain.usecase.DeleteTuningUseCase
 import com.dmribeiro.zondatuner.domain.usecase.GetTuningsUseCase
 import com.dmribeiro.zondatuner.domain.usecase.InsertTuningUseCase
+import com.dmribeiro.zondatuner.domain.usecase.SeedTuningsUseCase
 import com.dmribeiro.zondatuner.domain.usecase.UpdateTuningUseCase
 import org.koin.dsl.module
 
@@ -13,4 +14,5 @@ val domainModule = module {
     factory { InsertTuningUseCase(get<TuningRepository>()) }
     factory { DeleteTuningUseCase(get<TuningRepository>()) }
     factory { UpdateTuningUseCase(get<TuningRepository>()) }
+    factory { SeedTuningsUseCase(get<TuningRepository>()) }
 }

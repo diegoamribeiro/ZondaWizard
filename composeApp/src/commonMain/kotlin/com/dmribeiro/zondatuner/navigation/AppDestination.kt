@@ -30,7 +30,8 @@ sealed class AppDestination : Screen {
                     insertTuningUseCase = KoinPlatform.getKoin().get(),
                     deleteTuningUseCase = KoinPlatform.getKoin().get(),
                     tuningDataUiMapper = KoinPlatform.getKoin().get(),
-                    updateTuningUseCase = KoinPlatform.getKoin().get()
+                    updateTuningUseCase = KoinPlatform.getKoin().get(),
+                    seedTuningsUseCase = KoinPlatform.getKoin().get()
                 )
             }
 
