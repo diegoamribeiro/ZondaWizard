@@ -20,10 +20,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,9 +45,14 @@ import androidx.compose.ui.zIndex
 import com.dmribeiro.zondatuner.domain.model.GuitarString
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.utils.playTone
+import com.dmribeiro.zondatuner.utils.runAudio
 import com.dmribeiro.zondatuner.utils.vibrate
+import korlibs.io.async.launch
+import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.vectorResource
 import zondawizard.composeapp.generated.resources.Res
+import zondawizard.composeapp.generated.resources.compose_multiplatform
 import zondawizard.composeapp.generated.resources.pick_filled_upside_down
 import kotlin.math.sin
 
@@ -141,14 +151,18 @@ fun GuitarStringsSelector(
                                 guitarString.number,
                                 guitarString.octaveShift,
                             ) * 2
-                            playTone(freq, 600)
+                            runAudio {
+                                playTone(freq, 600)
+                            }
                         }else{
                             val freq = noteToFrequency(
                                 guitarString.note,
                                 guitarString.number,
                                 guitarString.octaveShift
                             )
-                            playTone(freq, 600)
+                            runAudio {
+                                playTone(freq, 600)
+                            }
                         }
                     },
                     onLongClick = {

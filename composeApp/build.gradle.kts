@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
 }
+val korioVersion = "4.0.10"
 
 kotlin {
     androidTarget {
@@ -38,6 +39,7 @@ kotlin {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.lifecycle.viewmodel)
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.compose)
@@ -45,8 +47,13 @@ kotlin {
             implementation("com.google.accompanist:accompanist-permissions:0.37.2")
             //noinspection GradlePath
             implementation(files("/Users/diegoribeiro/AndroidStudioProjects/ZondaWizard/composeApp/src/commonMain/libs/TarsosDSP-Android-latest.jar"))
+            implementation("com.soywiz.korlibs.korio:korio-android:$korioVersion")
         }
         commonMain.dependencies {
+
+            implementation("com.soywiz.korlibs.korio:korio:$korioVersion")
+            implementation("com.soywiz.korlibs.korau:korau:$korioVersion")
+
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
