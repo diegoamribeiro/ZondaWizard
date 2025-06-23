@@ -8,7 +8,6 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
-    alias(libs.plugins.swiftklib)
 }
 
 kotlin {
@@ -31,13 +30,6 @@ kotlin {
             baseName = "ComposeApp"
             isStatic = true
             linkerOpts.add("-lsqlite3")
-        }
-        iosTarget.compilations {
-            val main by getting {
-                cinterops{
-                    create("AudioHelper")
-                }
-            }
         }
     }
 
@@ -135,12 +127,5 @@ dependencies {
     implementation(libs.androidx.ui.android)
     debugImplementation(compose.uiTooling)
     ksp(libs.room.compiler)
-}
-
-swiftklib{
-    create("AudioHelper"){
-        path = file("../iosApp/iosApp/AudioHelper")
-        packageName = "com.dmribeiro.AudioHelper"
-    }
 }
 
