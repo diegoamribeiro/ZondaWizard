@@ -22,9 +22,8 @@ import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Phone
+
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,22 +37,23 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.dmribeiro.zondatuner.domain.model.GuitarString
+import com.dmribeiro.zondatuner.getPlatform
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.utils.playTone
 import com.dmribeiro.zondatuner.utils.runAudio
 import com.dmribeiro.zondatuner.utils.vibrate
-import korlibs.io.async.launch
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.vectorResource
 import zondawizard.composeapp.generated.resources.Res
-import zondawizard.composeapp.generated.resources.compose_multiplatform
 import zondawizard.composeapp.generated.resources.pick_filled_upside_down
+
+
 import kotlin.math.sin
 
 @Composable
@@ -239,8 +239,8 @@ fun PickButton(
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            painter = painterResource(Res.drawable.pick_filled_upside_down),
-            contentDescription = "Palheta",
+            imageVector = vectorResource(Res.drawable.pick_filled_upside_down),
+            contentDescription = "Pick",
             modifier = Modifier.size(60.dp),
             tint = when {
                 isTwelfthFretMode -> Color(0xFFFFA500) // 🧡 Laranja no modo 12ª casa
