@@ -1,6 +1,7 @@
 package com.dmribeiro.zondatuner.presentation.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +24,8 @@ import com.dmribeiro.zondatuner.AppLogger
 import com.dmribeiro.zondatuner.navigation.AppDestination
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.presentation.viewmodel.HomeScreenModel
+import com.dmribeiro.zondatuner.theme.Gray100
+import com.dmribeiro.zondatuner.theme.Gray300
 
 @Composable
 fun HomeScreenContent(
@@ -34,14 +37,14 @@ fun HomeScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(8.dp),
+            .background(Gray300),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("Lista de Afinações", style = MaterialTheme.typography.h6)
+            Text("Lista de Afinações", style = MaterialTheme.typography.h6, color = Color.LightGray)
             Button(onClick = { navigator?.push(AppDestination.CreateTuningScreen()) }) {
                 Text("+")
             }
@@ -52,7 +55,7 @@ fun HomeScreenContent(
         if (state.isEmpty()) {
             Text("Nenhuma afinação encontrada")
         } else {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(8.dp) ) {
                 items(state) { tuning ->
                     HomeListItem(
                         tuning = tuning,
@@ -76,8 +79,9 @@ fun HomeListItem(
             .fillMaxWidth()
             .padding(8.dp)
             .clickable { onSelect() },
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, Color.LightGray)
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color.DarkGray),
+        backgroundColor = Color.DarkGray
     ){
         Row(
             modifier = Modifier
@@ -87,20 +91,19 @@ fun HomeListItem(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(
-                modifier = Modifier.weight(1f) // ✅ Ocupa o espaço disponível antes do botão de edição
+                modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = tuning.name,
                     fontSize = 18.sp,
-                    color = Color.Gray,
+                    color = Gray100,
                     fontWeight = FontWeight.Bold
                 )
                 AppLogger.d("***DESCRIPTION:", "${tuning.description}" )
                 Text(
                     text = tuning.description,
                     fontSize = 14.sp,
-                    color = Color.LightGray,
-                    fontWeight = FontWeight.Bold
+                    color = Color.LightGray
                 )
             }
 

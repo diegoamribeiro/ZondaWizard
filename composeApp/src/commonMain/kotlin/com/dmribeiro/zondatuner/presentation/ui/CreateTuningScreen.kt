@@ -39,8 +39,6 @@ import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.utils.dismissKeyboardLambda
 import com.dmribeiro.zondatuner.utils.formatFrequency
 import kotlin.math.pow
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 
 
 @Composable
