@@ -1,7 +1,6 @@
 // iosMain/kotlin/com/dmribeiro/zondatuner/audio/FrequencyAudioProcessor.kt
 package com.dmribeiro.zondatuner.audio
 
-import com.dmribeiro.zondatuner.utils.TonePlayer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.get
 import platform.AVFAudio.*
@@ -49,7 +48,6 @@ actual class FrequencyAudioProcessor actual constructor(
             inputNode = eng.inputNode
 
             // 🔧 Setup do TonePlayer **antes** de ligar o engine
-            TonePlayer.setup(eng)
 
             // formatação do tap para Float32
             val hwFmt   = inputNode!!.inputFormatForBus(0u)

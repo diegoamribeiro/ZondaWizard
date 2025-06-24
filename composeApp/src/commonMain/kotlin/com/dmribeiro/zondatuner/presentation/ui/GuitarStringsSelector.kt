@@ -20,10 +20,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,17 +37,23 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.dmribeiro.zondatuner.domain.model.GuitarString
+import com.dmribeiro.zondatuner.getPlatform
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.utils.playTone
+import com.dmribeiro.zondatuner.utils.runAudio
 import com.dmribeiro.zondatuner.utils.vibrate
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.vectorResource
 import zondawizard.composeapp.generated.resources.Res
 import zondawizard.composeapp.generated.resources.pick_filled_upside_down
+
+
 import kotlin.math.sin
 
 @Composable
@@ -141,14 +151,18 @@ fun GuitarStringsSelector(
                                 guitarString.number,
                                 guitarString.octaveShift,
                             ) * 2
-                            playTone(freq, 600)
+                            runAudio {
+                                playTone(freq, 600)
+                            }
                         }else{
                             val freq = noteToFrequency(
                                 guitarString.note,
                                 guitarString.number,
                                 guitarString.octaveShift
                             )
-                            playTone(freq, 600)
+                            runAudio {
+                                playTone(freq, 600)
+                            }
                         }
                     },
                     onLongClick = {
@@ -225,8 +239,8 @@ fun PickButton(
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            painter = painterResource(Res.drawable.pick_filled_upside_down),
-            contentDescription = "Palheta",
+            imageVector = vectorResource(Res.drawable.pick_filled_upside_down),
+            contentDescription = "Pick",
             modifier = Modifier.size(60.dp),
             tint = when {
                 isTwelfthFretMode -> Color(0xFFFFA500) // 🧡 Laranja no modo 12ª casa

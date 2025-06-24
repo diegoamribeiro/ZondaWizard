@@ -31,6 +31,7 @@ dependencyResolutionManagement {
             name = "TarsosDSP repository"
             url = URI("https://mvn.0110.be/releases")
         }
+        maven(url = "https://jitpack.io")
     }
 }
 
