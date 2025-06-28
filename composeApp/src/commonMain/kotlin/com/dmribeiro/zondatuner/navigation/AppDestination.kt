@@ -19,7 +19,7 @@ sealed class AppDestination : Screen {
         override val key: String = "HomeScreenKey"
         override val topBarConfig = AppTopBarComponentState().apply {
             showBackButton = false
-            title = "Home"
+            title = "Zonda Tuner"
         }
 
         @Composable
