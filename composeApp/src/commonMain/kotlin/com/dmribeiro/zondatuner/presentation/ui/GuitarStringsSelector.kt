@@ -71,7 +71,7 @@ fun GuitarStringsSelector(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(350.dp),
+            .height(300.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.Bottom
     ) {
