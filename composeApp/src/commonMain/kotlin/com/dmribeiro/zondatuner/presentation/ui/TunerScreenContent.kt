@@ -3,10 +3,32 @@ package com.dmribeiro.zondatuner.presentation.ui
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -23,7 +45,6 @@ import com.dmribeiro.zondatuner.audio.MicrophoneCapture
 import com.dmribeiro.zondatuner.permissions.getPermissionHandler
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.presentation.viewmodel.HomeScreenModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.abs
@@ -134,7 +155,7 @@ fun TunerScreenWithAudio(
     // Layout principal da tela do afinador
     Column(
         modifier = Modifier
-            .fillMaxSize(),
+            .fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
 
@@ -156,11 +177,10 @@ fun TunerScreenWithAudio(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(260.dp)
-                .padding(16.dp),
+                .height(260.dp),
             contentAlignment = Alignment.Center
         ) {
-            TuningMeterArc(
+            TuningMeterBar(
                 detectedFrequency = detectedFrequency,
                 targetFrequency = targetFrequency,
                 targetNote = targetNote
@@ -172,8 +192,8 @@ fun TunerScreenWithAudio(
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            TextButton(onClick = { showDeleteDialog = true }) {
-                Text("Apagar afinação", color = MaterialTheme.colorScheme.error)
+            OutlinedButton(onClick = { showDeleteDialog = true }) {
+                Text("Deletar", color = MaterialTheme.colorScheme.error)
             }
             Button(onClick = onBack) {
                 Text("Voltar")
@@ -209,6 +229,99 @@ fun TunerScreenWithAudio(
                 }
             }
         )
+    }
+}
+
+@Composable
+fun TuningMeterBar(detectedFrequency: Float, targetFrequency: Float, targetNote: String) {
+    // A lógica para calcular os 'cents' e saber se está afinado é exatamente a mesma
+    val cents = if (detectedFrequency > 0f && targetFrequency > 0f) {
+        (1200 * log2(detectedFrequency / targetFrequency)).toFloat()
+    } else {
+        0f
+    }
+    val clampedCents = cents.coerceIn(-50f, 50f)
+    val isInTune = abs(cents) < 5f
+    val successGreen = Color(0xFF34C759)
+
+    // Cores do tema que vamos usar
+    val indicatorColor = if (isInTune) successGreen else MaterialTheme.colorScheme.onSurfaceVariant
+
+    // --- LÓGICA DE ANIMAÇÃO PARA A BARRA HORIZONTAL ---
+    // Mapeia a variação de -50 a +50 cents para uma fração de -1.0 a +1.0
+    val offsetRatio: Float by animateFloatAsState(
+        targetValue = clampedCents / 50f,
+        animationSpec = tween(durationMillis = 300)
+    )
+
+    // Layout principal do novo medidor: painel de texto e a barra abaixo
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Painel de Texto (similar ao anterior)
+        Text(
+            text = targetNote,
+            style = MaterialTheme.typography.displayMedium.copy(fontSize = 60.sp),
+            color = indicatorColor
+        )
+        Text(
+            text = "${detectedFrequency.roundToInt()} Hz / ${targetFrequency.roundToInt()} Hz",
+            style = MaterialTheme.typography.titleLarge,
+            color = Color(0xFFDAA520)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        val statusText = when {
+            isInTune -> "Afinado!"
+            cents < -5f -> "Aperte"
+            cents > 5f -> "Afrouxe"
+            else -> "..."
+        }
+        Text(statusText, style = MaterialTheme.typography.titleLarge, color = indicatorColor)
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Canvas para desenhar a barra horizontal
+        Canvas(modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp)) {
+            val barHeight = size.height * 0.5f
+            val barWidth = size.width * 0.9f
+            val barTopLeft = Offset((size.width - barWidth) / 2, (size.height - barHeight) / 2)
+
+            // --- Barra de Gradiente de Fundo ---
+            val brush = Brush.horizontalGradient(
+                // Os 'colorStops' garantem que o verde fique exatamente no centro
+                colorStops = arrayOf(
+                    0.0f to Color.Red,
+                    0.4f to Color.Yellow,
+                    0.5f to successGreen, // Verde no meio
+                    0.6f to Color.Yellow,
+                    1.0f to Color.Red
+                )
+            )
+            drawRoundRect(
+                brush = brush,
+                topLeft = barTopLeft,
+                size = Size(barWidth, barHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barHeight / 2)
+            )
+
+            // --- Linha Indicadora Central (para referência) ---
+            drawLine(
+                color = Color.White.copy(alpha = 0.4f),
+                start = Offset(center.x, barTopLeft.y - 10.dp.toPx()),
+                end = Offset(center.x, barTopLeft.y + barHeight + 10.dp.toPx()),
+                strokeWidth = 2f
+            )
+
+            // --- Ponteiro/Indicador que se move ---
+            val indicatorPositionX = center.x + (offsetRatio * barWidth / 2)
+            drawLine(
+                color = indicatorColor,
+                start = Offset(indicatorPositionX, barTopLeft.y - 10.dp.toPx()),
+                end = Offset(indicatorPositionX, barTopLeft.y + barHeight + 10.dp.toPx()),
+                strokeWidth = 4f,
+                cap = StrokeCap.Round
+            )
+        }
     }
 }
 

@@ -244,7 +244,7 @@ fun PickButton(
             modifier = Modifier.size(60.dp),
             tint = when {
                 isTwelfthFretMode -> Color(0xFFFFA500) // 🧡 Laranja no modo 12ª casa
-                isSelected -> Color.Blue
+                isSelected -> Color(0xFF34C759)
                 else -> Color.Gray
             }
         )
