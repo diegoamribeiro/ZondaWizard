@@ -1,19 +1,39 @@
 package com.dmribeiro.zondatuner.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.presentation.ui.CreateTuningScreenContent
 import com.dmribeiro.zondatuner.presentation.ui.HomeScreenContent
+import com.dmribeiro.zondatuner.presentation.ui.SplashScreenContent
 import com.dmribeiro.zondatuner.presentation.ui.TunerScreenContent
 import com.dmribeiro.zondatuner.presentation.viewmodel.HomeScreenModel
+import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import org.koin.mp.KoinPlatform
 
 sealed class AppDestination : Screen {
     abstract val topBarConfig: AppTopBarComponentState
+
+    data object SplashScreen : AppDestination() {
+        override val topBarConfig = AppTopBarComponentState()
+
+        @Composable
+        override fun Content() {
+            val navigator = LocalNavigator.currentOrThrow
+
+            LaunchedEffect(Unit) {
+                delay(2000L)
+                navigator.replace(HomeScreen)
+            }
+
+            SplashScreenContent()
+        }
+    }
 
     data object HomeScreen : AppDestination() {
         override val key: String = "HomeScreenKey"
