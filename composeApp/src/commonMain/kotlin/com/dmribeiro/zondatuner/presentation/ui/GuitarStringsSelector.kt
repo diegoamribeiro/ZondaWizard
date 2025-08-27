@@ -52,7 +52,8 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.vectorResource
 import zondawizard.composeapp.generated.resources.Res
 import zondawizard.composeapp.generated.resources.pick_filled_upside_down
-
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.material.MaterialTheme
 
 import kotlin.math.sin
 
@@ -277,4 +278,32 @@ fun TuningDataUi.getGuitarStrings(): List<GuitarString> {
         GuitarString(2, strings[4].frequency, strings[4].note, strings[4].octaveShift),
         GuitarString(1, strings[5].frequency, strings[5].note, strings[5].octaveShift)
     )
+}
+
+@Preview
+@Composable
+fun GuitarStringsSelectorPreview() {
+    val sampleTuning = TuningDataUi(
+        id = 0L,
+        name = "Standard",
+        description = "EADGBE",
+        strings = listOf(
+            GuitarString(6, 82.41f, "E", -2),
+            GuitarString(5, 110.00f, "A", 0),
+            GuitarString(4, 146.83f, "D", 0),
+            GuitarString(3, 196.00f, "G", 0),
+            GuitarString(2, 246.94f, "B", 0),
+            GuitarString(1, 329.63f, "E", 0)
+        )
+    )
+
+    MaterialTheme {
+        GuitarStringsSelector(
+            tuning = sampleTuning,
+            selectedString = 6,
+            isTwelfthFretMode = false,
+            onStringSelected = {},
+            onToggleTwelfthFretMode = {}
+        )
+    }
 }

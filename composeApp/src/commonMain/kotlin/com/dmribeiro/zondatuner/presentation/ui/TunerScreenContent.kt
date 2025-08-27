@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dmribeiro.zondatuner.audio.MicrophoneCapture
+import com.dmribeiro.zondatuner.domain.model.GuitarString
 import com.dmribeiro.zondatuner.permissions.getPermissionHandler
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.presentation.viewmodel.HomeScreenModel
@@ -50,6 +51,7 @@ import org.koin.compose.koinInject
 import kotlin.math.abs
 import kotlin.math.log2
 import kotlin.math.roundToInt
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 fun TunerScreenContent(
@@ -435,5 +437,28 @@ fun TuningMeterArc(detectedFrequency: Float, targetFrequency: Float, targetNote:
             drawCircle(color = indicatorColor, radius = 12f, center = center) // <-- CORREÇÃO
             drawCircle(color = backgroundColor, radius = 6f, center = center) // <-- CORREÇÃO
         }
+    }
+}
+
+
+@Preview
+@Composable
+fun TunerScreenContentPreview() {
+    val sampleTuning = TuningDataUi(
+        id = 0L,
+        name = "Standard",
+        description = "EADGBE",
+        strings = listOf(
+            GuitarString(6, 82.41f, "E", -2),
+            GuitarString(5, 110.00f, "A", 0),
+            GuitarString(4, 146.83f, "D", 0),
+            GuitarString(3, 196.00f, "G", 0),
+            GuitarString(2, 246.94f, "B", 0),
+            GuitarString(1, 329.63f, "E", 0)
+        )
+    )
+
+    MaterialTheme {
+        TunerScreenContent(onBack = {}, tuning = sampleTuning)
     }
 }
