@@ -175,7 +175,7 @@ fun TunerScreenWithAudio(
 
         Spacer(Modifier.height(20.dp))
 
-        /* 2) MEDIDOR EM ARCO – altura controlada, colado na base */
+        /* 2) MEDIDOR EM BARRA – altura controlada, colado na base */
         Box(
             Modifier
                 .fillMaxWidth()
@@ -264,13 +264,23 @@ fun TuningMeterBar(detectedFrequency: Float, targetFrequency: Float, targetNote:
             style = MaterialTheme.typography.displayMedium.copy(fontSize = 60.sp),
             color = indicatorColor
         )
+
+        // Exibe as frequências de forma limpa
+        val detectedText = if (detectedFrequency > 0f) {
+            "${detectedFrequency.roundToInt()} Hz"
+        } else {
+            "--- Hz"
+        }
+        val targetText = "${targetFrequency.roundToInt()} Hz"
+
         Text(
-            text = "${detectedFrequency.roundToInt()} Hz / ${targetFrequency.roundToInt()} Hz",
+            text = "$detectedText / $targetText",
             style = MaterialTheme.typography.titleLarge,
             color = Color(0xFFDAA520)
         )
         Spacer(modifier = Modifier.height(8.dp))
         val statusText = when {
+            detectedFrequency <= 0f -> "Aguardando som..."
             isInTune -> "Afinado!"
             cents < -5f -> "Aperte"
             cents > 5f -> "Afrouxe"
@@ -346,8 +356,9 @@ fun TuningMeterArc(detectedFrequency: Float, targetFrequency: Float, targetNote:
 
     // --- CORREÇÃO: CAPTURAMOS AS CORES DO TEMA AQUI ---
     // Fazemos isso no escopo @Composable, ANTES do Canvas.
+    val successGreen = Color(0xFF34C759)
     val indicatorColor =
-        if (isInTune) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        if (isInTune) successGreen else MaterialTheme.colorScheme.onSurfaceVariant
     val surfaceColor = MaterialTheme.colorScheme.surface
     val backgroundColor = MaterialTheme.colorScheme.background
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -362,13 +373,23 @@ fun TuningMeterArc(detectedFrequency: Float, targetFrequency: Float, targetNote:
                 style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
                 color = indicatorColor
             )
+
+            // Exibe as frequências formatadas com uma casa decimal
+            val detectedText = if (detectedFrequency > 0f) {
+                "${detectedFrequency.roundToInt()} Hz"
+            } else {
+                "--- Hz"
+            }
+            val targetText = "${targetFrequency.roundToInt()} Hz"
+
             Text(
-                text = "${detectedFrequency.roundToInt()} Hz / ${targetFrequency.roundToInt()} Hz",
+                text = "$detectedText / $targetText",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant // Aqui podemos acessar diretamente, pois Text é @Composable
             )
             Spacer(modifier = Modifier.height(8.dp))
             val statusText = when {
+                detectedFrequency <= 0f -> "Aguardando som..."
                 isInTune -> "Afinado!"
                 cents < -5f -> "Aperte"
                 cents > 5f -> "Afrouxe"
@@ -393,8 +414,6 @@ fun TuningMeterArc(detectedFrequency: Float, targetFrequency: Float, targetNote:
                 size = Size(arcSize, arcSize),
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
-
-            val successGreen = Color(0xFF34C759) // O verde padrão do sistema iOS
 
             // Gradiente de cor para o arco principal
             val brush = Brush.sweepGradient(

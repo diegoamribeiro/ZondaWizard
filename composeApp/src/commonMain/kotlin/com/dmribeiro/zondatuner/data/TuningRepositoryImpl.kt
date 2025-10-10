@@ -79,12 +79,12 @@ class TuningRepositoryImpl(
                 name = "Drop D# (Charlie Brown Jr)",
                 description = "Drop D# do Charlie Brown Jr",
                 strings = listOf(
-                    GuitarString(6, 77.78f, "D#", 0),
-                    GuitarString(5, 116.54f, "G#", 0),
-                    GuitarString(4, 155.56f, "C#", 0),
-                    GuitarString(3, 207.65f, "F#", 0),
-                    GuitarString(2, 233.08f, "A#", 0),
-                    GuitarString(1, 311.13f, "D#", 0)
+                    GuitarString(6, 77.78f, "Eb", 0),
+                    GuitarString(5, 103.83f, "Ab", 0),
+                    GuitarString(4, 138.59f, "Db", 0),
+                    GuitarString(3, 185.00f, "Gb", 0),
+                    GuitarString(2, 233.08f, "Bb", 0),
+                    GuitarString(1, 311.13f, "Eb", 0)
                 )
             ),
             Tuning(
@@ -108,11 +108,25 @@ class TuningRepositoryImpl(
                     GuitarString(6, 73.42f, "D", 0),
                     GuitarString(5, 110.00f, "A", 0),
                     GuitarString(4, 146.83f, "D", 0),
-                    GuitarString(3, 110.00f, "A", 0),
-                    GuitarString(2, 146.83f, "D", 0),
-                    GuitarString(1, 146.83f, "D", 0)
+                    GuitarString(3, 220.00f, "A", 0),
+                    GuitarString(2, 293.66f, "D", 0),
+                    GuitarString(1, 293.66f, "D", 0)
+                )
+            ),
+            Tuning(
+                id = 0,
+                name = "Alive (P.O.D.)",
+                description = "C G C F A D",
+                strings = listOf(
+                    GuitarString(6, 65.41f, "C", 0),
+                    GuitarString(5, 98.00f, "G", 0),
+                    GuitarString(4, 130.81f, "C", 0),
+                    GuitarString(3, 174.61f, "F", 0),
+                    GuitarString(2, 220.00f, "A", 0),
+                    GuitarString(1, 293.66f, "D", 0)
                 )
             )
+
         )
     }
 

@@ -142,28 +142,13 @@ fun GuitarStringsSelector(
                 PickButton(
                     stringNumber = guitarString.number,
                     note = guitarString.note,
+                    frequency = guitarString.frequency,
                     isSelected = isSelected,
                     isTwelfthFretMode = if (isSelected) isTwelfthFretMode else false,
-                    onClick = {
+                    onClick = { freq ->
                         onStringSelected(guitarString.number)
-                        if (isLongPressed){
-                            val freq = noteToFrequency(
-                                guitarString.note,
-                                guitarString.number,
-                                guitarString.octaveShift,
-                            ) * 2
-                            runAudio {
-                                playTone(freq, 600)
-                            }
-                        }else{
-                            val freq = noteToFrequency(
-                                guitarString.note,
-                                guitarString.number,
-                                guitarString.octaveShift
-                            )
-                            runAudio {
-                                playTone(freq, 600)
-                            }
+                        runAudio {
+                            playTone(freq, 600)
                         }
                     },
                     onLongClick = {
@@ -214,9 +199,10 @@ fun animateWave(amplitude: Float, duration: Int): Float {
 fun PickButton(
     stringNumber: Int,
     note: String,
+    frequency: Float,
     isSelected: Boolean,
     isTwelfthFretMode: Boolean,
-    onClick: () -> Unit,
+    onClick: (Float) -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -229,11 +215,13 @@ fun PickButton(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onLongPress = {
-                        onLongClick() // ✅ Agora certinho!
-                        vibrateAction()// 🧨 Vibra quando clicar longo
+                        onLongClick() // Agora certinho!
+                        vibrateAction()// Vibra quando clicar longo
                     },
                     onTap = {
-                        onClick() // ✅ Tap normal
+                        // Calcula a frequência baseada no modo (12ª casa = frequência dobrada)
+                        val targetFrequency = if (isTwelfthFretMode) frequency * 2 else frequency
+                        onClick(targetFrequency) // Tap normal
                     }
                 )
             },
@@ -288,7 +276,7 @@ fun GuitarStringsSelectorPreview() {
         name = "Standard",
         description = "EADGBE",
         strings = listOf(
-            GuitarString(6, 82.41f, "E", -2),
+            GuitarString(6, 82.41f, "E", 0),
             GuitarString(5, 110.00f, "A", 0),
             GuitarString(4, 146.83f, "D", 0),
             GuitarString(3, 196.00f, "G", 0),
