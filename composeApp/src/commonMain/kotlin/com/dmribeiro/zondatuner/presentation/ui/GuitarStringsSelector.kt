@@ -18,17 +18,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.Icon
-import androidx.compose.material.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
-
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
@@ -43,19 +37,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.dmribeiro.zondatuner.domain.model.GuitarString
-import com.dmribeiro.zondatuner.getPlatform
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.utils.playTone
 import com.dmribeiro.zondatuner.utils.runAudio
 import com.dmribeiro.zondatuner.utils.vibrate
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.vectorResource
 import zondawizard.composeapp.generated.resources.Res
 import zondawizard.composeapp.generated.resources.pick_filled_upside_down
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import androidx.compose.material.MaterialTheme
 
 import kotlin.math.sin
+
+private val TwelfthFretOrange = Color(0xFFFFA500)
+private val SelectedPickGreen = Color(0xFF34C759)
 
 @Composable
 fun GuitarStringsSelector(
@@ -67,7 +61,8 @@ fun GuitarStringsSelector(
 ) {
     val stringThicknesses = listOf(6.dp, 5.dp, 4.dp, 3.dp, 2.dp, 1.dp)
     val strings = tuning.getGuitarStrings()
-    var isLongPressed by remember { mutableStateOf(false) }
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Row(
         modifier = Modifier
@@ -78,7 +73,7 @@ fun GuitarStringsSelector(
     ) {
         strings.forEachIndexed { index, guitarString ->
             val isSelected = guitarString.number == selectedString
-            val baseColor = if (isSelected) Color(0xFFDAA520) else Color(0xFFA0A0A0)
+            val baseColor = if (isSelected) primaryColor else mutedColor
             val secondaryColor = baseColor.copy(alpha = 0.3f)
 
             val waveOffset = if (isSelected) animateWave(3f, 100) else 0f
@@ -151,10 +146,7 @@ fun GuitarStringsSelector(
                             playTone(freq, 600)
                         }
                     },
-                    onLongClick = {
-                        isLongPressed = !isLongPressed
-                        onToggleTwelfthFretMode()
-                    },
+                    onLongClick = onToggleTwelfthFretMode,
                     modifier = Modifier
                         .zIndex(1f)
                         .offset(y = (160).dp)
@@ -208,20 +200,23 @@ fun PickButton(
 ) {
 
     val vibrateAction = vibrate()
+    val labelColor = MaterialTheme.colorScheme.onPrimary
 
     Box(
         modifier = modifier
             .size(60.dp)
-            .pointerInput(Unit) {
+            .pointerInput(isTwelfthFretMode, frequency, isSelected) {
                 detectTapGestures(
                     onLongPress = {
-                        onLongClick() // Agora certinho!
-                        vibrateAction()// Vibra quando clicar longo
+                        onLongClick()
+                        vibrateAction()
+                        // Long press alterna o modo e toca a oitava correspondente.
+                        val targetFrequency = if (!isTwelfthFretMode) frequency * 2 else frequency
+                        onClick(targetFrequency)
                     },
                     onTap = {
-                        // Calcula a frequência baseada no modo (12ª casa = frequência dobrada)
                         val targetFrequency = if (isTwelfthFretMode) frequency * 2 else frequency
-                        onClick(targetFrequency) // Tap normal
+                        onClick(targetFrequency)
                     }
                 )
             },
@@ -232,9 +227,9 @@ fun PickButton(
             contentDescription = "Pick",
             modifier = Modifier.size(60.dp),
             tint = when {
-                isTwelfthFretMode -> Color(0xFFFFA500) // 🧡 Laranja no modo 12ª casa
-                isSelected -> Color(0xFF34C759)
-                else -> Color.Gray
+                isTwelfthFretMode -> TwelfthFretOrange
+                isSelected -> SelectedPickGreen
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
             }
         )
 
@@ -245,12 +240,12 @@ fun PickButton(
             Text(
                 text = stringNumber.toString(),
                 fontSize = 12.sp,
-                color = Color.White
+                color = labelColor
             )
             Text(
                 text = note,
                 fontSize = 14.sp,
-                color = Color.White
+                color = labelColor
             )
         }
     }

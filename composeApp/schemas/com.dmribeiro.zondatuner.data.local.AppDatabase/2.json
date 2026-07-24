@@ -1,0 +1,151 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "1777ab77964cf2817f8cf998c94d6c33",
+    "entities": [
+      {
+        "tableName": "tunings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `string6Frequency` REAL NOT NULL, `string6Note` TEXT NOT NULL, `string6OctaveShift` INTEGER NOT NULL, `string5Frequency` REAL NOT NULL, `string5Note` TEXT NOT NULL, `string5OctaveShift` INTEGER NOT NULL, `string4Frequency` REAL NOT NULL, `string4Note` TEXT NOT NULL, `string4OctaveShift` INTEGER NOT NULL, `string3Frequency` REAL NOT NULL, `string3Note` TEXT NOT NULL, `string3OctaveShift` INTEGER NOT NULL, `string2Frequency` REAL NOT NULL, `string2Note` TEXT NOT NULL, `string2OctaveShift` INTEGER NOT NULL, `string1Frequency` REAL NOT NULL, `string1Note` TEXT NOT NULL, `string1OctaveShift` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string6Frequency",
+            "columnName": "string6Frequency",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string6Note",
+            "columnName": "string6Note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string6OctaveShift",
+            "columnName": "string6OctaveShift",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string5Frequency",
+            "columnName": "string5Frequency",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string5Note",
+            "columnName": "string5Note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string5OctaveShift",
+            "columnName": "string5OctaveShift",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string4Frequency",
+            "columnName": "string4Frequency",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string4Note",
+            "columnName": "string4Note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string4OctaveShift",
+            "columnName": "string4OctaveShift",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string3Frequency",
+            "columnName": "string3Frequency",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string3Note",
+            "columnName": "string3Note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string3OctaveShift",
+            "columnName": "string3OctaveShift",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string2Frequency",
+            "columnName": "string2Frequency",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string2Note",
+            "columnName": "string2Note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string2OctaveShift",
+            "columnName": "string2OctaveShift",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string1Frequency",
+            "columnName": "string1Frequency",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string1Note",
+            "columnName": "string1Note",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "string1OctaveShift",
+            "columnName": "string1OctaveShift",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1777ab77964cf2817f8cf998c94d6c33')"
+    ]
+  }
+}

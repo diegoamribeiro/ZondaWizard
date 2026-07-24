@@ -24,6 +24,9 @@ import org.jetbrains.compose.resources.painterResource
 import zondawizard.composeapp.generated.resources.Res
 import zondawizard.composeapp.generated.resources.icon_minus_line
 import zondawizard.composeapp.generated.resources.pick_filled_upside_down
+import com.dmribeiro.zondatuner.utils.chromaticNotes
+import com.dmribeiro.zondatuner.utils.chromaticIndex
+import com.dmribeiro.zondatuner.utils.normalizeNote
 import kotlin.math.pow
 
 @Composable
@@ -37,7 +40,7 @@ fun CreateTuningScreenContent(
     var stringsState by remember {
         mutableStateOf(existingTuning?.strings?.map { it.copy() } ?: defaultStrings())
     }
-    val notes = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+    val notes = chromaticNotes()
     val dismissKeyboard = dismissKeyboardLambda()
 
     Surface(
@@ -50,12 +53,7 @@ fun CreateTuningScreenContent(
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = existingTuning?.name ?: "Criar Nova Afinação",
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // CORREÇÃO: Usando OutlinedTextField e TextFieldDefaults do Material 3
             OutlinedTextField(
@@ -260,11 +258,7 @@ fun defaultStrings(): List<GuitarString> = listOf(
     GuitarString(1, 329.63f, "E", 0)
 )
 fun noteToFrequency(note: String, stringNumber: Int, octaveShift: Int = 0): Float {
-    val baseFrequencies = mapOf(
-        "C" to 16.35f, "C#" to 17.32f, "D" to 18.35f, "D#" to 19.45f, "E" to 20.60f,
-        "F" to 21.83f, "F#" to 23.12f, "G" to 24.50f, "G#" to 25.96f, "A" to 27.50f,
-        "A#" to 29.14f, "B" to 30.87f
-    )
+    val normalizedNote = normalizeNote(note)
     val standardTuning = mapOf(
         6 to "E" to 82.41f,
         5 to "A" to 110.00f,
@@ -276,7 +270,7 @@ fun noteToFrequency(note: String, stringNumber: Int, octaveShift: Int = 0): Floa
     val standardEntry = standardTuning.entries.find { it.key.first == stringNumber } ?: return 0f
     val baseNote = standardEntry.key.second
     val baseFrequency = standardEntry.value
-    val semitoneDifference = baseFrequencies.keys.indexOf(note) - baseFrequencies.keys.indexOf(baseNote)
+    val semitoneDifference = chromaticIndex(normalizedNote) - chromaticIndex(baseNote)
     val adjustedFrequency = baseFrequency * (2.0.pow(semitoneDifference / 12.0)).toFloat()
     return adjustedFrequency * (2.0.pow(octaveShift)).toFloat()
 }

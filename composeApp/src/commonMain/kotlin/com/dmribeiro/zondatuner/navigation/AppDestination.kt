@@ -1,11 +1,17 @@
 package com.dmribeiro.zondatuner.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.dmribeiro.zondatuner.navigation.LocalTopBarMenuActions
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.presentation.ui.CreateTuningScreenContent
 import com.dmribeiro.zondatuner.presentation.ui.HomeScreenContent
@@ -39,7 +45,7 @@ sealed class AppDestination : Screen {
         override val key: String = "HomeScreenKey"
         override val topBarConfig = AppTopBarComponentState().apply {
             showBackButton = false
-            title = "Zonda Tuner"
+            title = "Minhas Afinações"
         }
 
         @Composable
@@ -98,14 +104,30 @@ sealed class AppDestination : Screen {
         override val topBarConfig = AppTopBarComponentState().apply {
             title = tuning.name
             showBackButton = true
+            showMenuButton = true
         }
 
         @Composable
         override fun Content() {
             val navigator = LocalNavigator.current
+            val menuActions = LocalTopBarMenuActions.current
+            var deleteMenuClicked by remember { mutableStateOf(false) }
+
+            DisposableEffect(tuning) {
+                menuActions.onEdit = {
+                    navigator?.push(CreateTuningScreen(existingTuning = tuning))
+                }
+                menuActions.onDelete = { deleteMenuClicked = true }
+                onDispose {
+                    menuActions.clear()
+                }
+            }
+
             TunerScreenContent(
                 onBack = { navigator?.pop() },
-                tuning = tuning
+                tuning = tuning,
+                deleteMenuClicked = deleteMenuClicked,
+                onDeleteMenuHandled = { deleteMenuClicked = false }
             )
         }
     }

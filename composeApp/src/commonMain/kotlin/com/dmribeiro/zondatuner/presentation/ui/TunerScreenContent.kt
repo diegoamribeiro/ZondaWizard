@@ -1,12 +1,12 @@
 package com.dmribeiro.zondatuner.presentation.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +17,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,7 +26,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,32 +34,35 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dmribeiro.zondatuner.audio.MicrophoneCapture
+import com.dmribeiro.zondatuner.audio.TunerReadingHold
+import com.dmribeiro.zondatuner.audio.createPitchSmoother
 import com.dmribeiro.zondatuner.domain.model.GuitarString
 import com.dmribeiro.zondatuner.permissions.getPermissionHandler
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.presentation.viewmodel.HomeScreenModel
-import kotlinx.coroutines.launch
+import com.dmribeiro.zondatuner.utils.runAudio
+import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import kotlin.math.abs
 import kotlin.math.log2
 import kotlin.math.roundToInt
+import kotlin.time.TimeSource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 fun TunerScreenContent(
     onBack: () -> Unit,
-    tuning: TuningDataUi
+    tuning: TuningDataUi,
+    deleteMenuClicked: Boolean = false,
+    onDeleteMenuHandled: () -> Unit = {},
 ) {
     var permissionGranted by remember { mutableStateOf<Boolean?>(null) }
     val permissionHandler = getPermissionHandler()
 
-    // Este LaunchedEffect verifica e solicita a permissão uma vez
     LaunchedEffect(Unit) {
         permissionHandler.hasAudioPermission { granted ->
             permissionGranted = granted
@@ -73,13 +74,17 @@ fun TunerScreenContent(
         }
     }
 
-    // O fundo geral agora é controlado pelo tema
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         when (permissionGranted) {
-            true -> TunerScreenWithAudio(onBack, tuning)
+            true -> TunerScreenWithAudio(
+                onBack = onBack,
+                tuning = tuning,
+                deleteMenuClicked = deleteMenuClicked,
+                onDeleteMenuHandled = onDeleteMenuHandled,
+            )
             false -> PermissionRequestScreen(onRequestPermission = {
                 permissionHandler.requestAudioPermission { granted ->
                     permissionGranted = granted
@@ -126,19 +131,35 @@ fun PermissionRequestScreen(onRequestPermission: () -> Unit) {
 fun TunerScreenWithAudio(
     onBack: () -> Unit,
     tuning: TuningDataUi,
+    deleteMenuClicked: Boolean = false,
+    onDeleteMenuHandled: () -> Unit = {},
     viewModel: HomeScreenModel = koinInject()
 ) {
     var detectedFrequency by remember { mutableStateOf(0f) }
+    var signalActive by remember { mutableStateOf(false) }
     var isTwelfthFretMode by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var selectedStringIndex by remember { mutableStateOf(6) }
 
-    // CORREÇÃO: Usamos o CoroutineScope para garantir a atualização do estado na Main Thread
-    val scope = rememberCoroutineScope()
+    LaunchedEffect(deleteMenuClicked) {
+        if (deleteMenuClicked) {
+            showDeleteDialog = true
+            onDeleteMenuHandled()
+        }
+    }
+
+    val pitchSmoother = remember { createPitchSmoother() }
+    val readingHold = remember { TunerReadingHold() }
+    val timeSource = TimeSource.Monotonic
+
     val audioProcessor = remember {
         MicrophoneCapture { freq ->
-            scope.launch {
-                detectedFrequency = freq
+            runAudio {
+                val now = timeSource.markNow()
+                val smoothed = pitchSmoother.add(freq)
+                readingHold.update(smoothed, now)
+                detectedFrequency = readingHold.heldFrequency
+                signalActive = readingHold.isReceivingSignal(now)
             }
         }
     }
@@ -148,20 +169,76 @@ fun TunerScreenWithAudio(
         onDispose { audioProcessor.stop() }
     }
 
+    // Só limpa depois de silêncio prolongado; falhas curtas mantêm o ponteiro estável.
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(400)
+            val now = timeSource.markNow()
+            signalActive = readingHold.isReceivingSignal(now)
+            if (readingHold.shouldClear(now) && detectedFrequency > 0f) {
+                readingHold.reset()
+                pitchSmoother.reset()
+                detectedFrequency = 0f
+                signalActive = false
+            }
+        }
+    }
+
     val selectedString = tuning.getGuitarStrings().find { it.number == selectedStringIndex }
         ?: tuning.getGuitarStrings().first()
     val targetFrequency =
         if (isTwelfthFretMode) selectedString.frequency * 2 else selectedString.frequency
     val targetNote = selectedString.note
 
-    // Layout principal da tela do afinador
+    // Troca de corda/modo: descarta o histórico para não arrastar valores antigos.
+    LaunchedEffect(selectedStringIndex, isTwelfthFretMode) {
+        pitchSmoother.reset()
+        readingHold.reset()
+        detectedFrequency = 0f
+        signalActive = false
+    }
+
     Column(
         modifier = Modifier
-            .fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
+        if (tuning.displaySubtitle().isNotBlank()) {
+            Text(
+                text = tuning.displaySubtitle(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
-        Box(modifier = Modifier.fillMaxWidth()){
+        if (!isTwelfthFretMode) {
+            Text(
+                text = "Segure a palheta para afinar na 12ª casa",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        } else {
+            Text(
+                text = "Modo 12ª casa ativo",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
             GuitarStringsSelector(
                 tuning = tuning,
                 selectedString = selectedStringIndex,
@@ -173,11 +250,8 @@ fun TunerScreenWithAudio(
             )
         }
 
-        Spacer(Modifier.height(20.dp))
-
-        /* 2) MEDIDOR EM BARRA – altura controlada, colado na base */
         Box(
-            Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .height(260.dp),
             contentAlignment = Alignment.Center
@@ -185,25 +259,12 @@ fun TunerScreenWithAudio(
             TuningMeterBar(
                 detectedFrequency = detectedFrequency,
                 targetFrequency = targetFrequency,
-                targetNote = targetNote
+                targetNote = targetNote,
+                signalActive = signalActive,
             )
-        }
-
-        Row(
-            Modifier
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            OutlinedButton(onClick = { showDeleteDialog = true }) {
-                Text("Deletar", color = MaterialTheme.colorScheme.error)
-            }
-            Button(onClick = onBack) {
-                Text("Voltar")
-            }
         }
     }
 
-    // Diálogo de alerta com o estilo do Material 3
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -235,25 +296,26 @@ fun TunerScreenWithAudio(
 }
 
 @Composable
-fun TuningMeterBar(detectedFrequency: Float, targetFrequency: Float, targetNote: String) {
-    // A lógica para calcular os 'cents' e saber se está afinado é exatamente a mesma
+fun TuningMeterBar(
+    detectedFrequency: Float,
+    targetFrequency: Float,
+    targetNote: String,
+    signalActive: Boolean = true,
+) {
     val cents = if (detectedFrequency > 0f && targetFrequency > 0f) {
         (1200 * log2(detectedFrequency / targetFrequency)).toFloat()
     } else {
         0f
     }
     val clampedCents = cents.coerceIn(-50f, 50f)
-    val isInTune = abs(cents) < 5f
+    val isInTune = signalActive && abs(cents) < 5f
     val successGreen = Color(0xFF34C759)
 
-    // Cores do tema que vamos usar
     val indicatorColor = if (isInTune) successGreen else MaterialTheme.colorScheme.onSurfaceVariant
 
-    // --- LÓGICA DE ANIMAÇÃO PARA A BARRA HORIZONTAL ---
-    // Mapeia a variação de -50 a +50 cents para uma fração de -1.0 a +1.0
-    val offsetRatio: Float by animateFloatAsState(
+    val offsetRatio by animateFloatAsState(
         targetValue = clampedCents / 50f,
-        animationSpec = tween(durationMillis = 300)
+        animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
     )
 
     // Layout principal do novo medidor: painel de texto e a barra abaixo
@@ -281,6 +343,7 @@ fun TuningMeterBar(detectedFrequency: Float, targetFrequency: Float, targetNote:
         Spacer(modifier = Modifier.height(8.dp))
         val statusText = when {
             detectedFrequency <= 0f -> "Aguardando som..."
+            !signalActive -> "..."
             isInTune -> "Afinado!"
             cents < -5f -> "Aperte"
             cents > 5f -> "Afrouxe"
@@ -336,129 +399,6 @@ fun TuningMeterBar(detectedFrequency: Float, targetFrequency: Float, targetNote:
         }
     }
 }
-
-// O NOVO COMPOSABLE DO MEDIDOR COM O PONTEIRO
-// NOVO COMPOSABLE: O Medidor em Arco
-@Composable
-fun TuningMeterArc(detectedFrequency: Float, targetFrequency: Float, targetNote: String) {
-    // ... (a lógica de 'cents', 'angle', etc., continua a mesma)
-    val cents = if (detectedFrequency > 0f && targetFrequency > 0f) {
-        (1200 * log2(detectedFrequency / targetFrequency)).toFloat()
-    } else {
-        0f
-    }
-    val clampedCents = cents.coerceIn(-50f, 50f)
-    val angle: Float by animateFloatAsState(
-        targetValue = (clampedCents / 50f) * 60f,
-        animationSpec = tween(durationMillis = 300)
-    )
-    val isInTune = abs(cents) < 5f
-
-    // --- CORREÇÃO: CAPTURAMOS AS CORES DO TEMA AQUI ---
-    // Fazemos isso no escopo @Composable, ANTES do Canvas.
-    val successGreen = Color(0xFF34C759)
-    val indicatorColor =
-        if (isInTune) successGreen else MaterialTheme.colorScheme.onSurfaceVariant
-    val surfaceColor = MaterialTheme.colorScheme.surface
-    val backgroundColor = MaterialTheme.colorScheme.background
-    val primaryColor = MaterialTheme.colorScheme.primary
-    // ----------------------------------------------------
-
-
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
-        // O painel de texto no centro (usa 'indicatorColor' que já capturamos)
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = targetNote,
-                style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
-                color = indicatorColor
-            )
-
-            // Exibe as frequências formatadas com uma casa decimal
-            val detectedText = if (detectedFrequency > 0f) {
-                "${detectedFrequency.roundToInt()} Hz"
-            } else {
-                "--- Hz"
-            }
-            val targetText = "${targetFrequency.roundToInt()} Hz"
-
-            Text(
-                text = "$detectedText / $targetText",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant // Aqui podemos acessar diretamente, pois Text é @Composable
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            val statusText = when {
-                detectedFrequency <= 0f -> "Aguardando som..."
-                isInTune -> "Afinado!"
-                cents < -5f -> "Aperte"
-                cents > 5f -> "Afrouxe"
-                else -> "..."
-            }
-            Text(statusText, style = MaterialTheme.typography.titleLarge, color = indicatorColor)
-        }
-
-        // O Canvas que desenha o arco e a agulha
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val arcSize = size.width * 0.7f
-            val strokeWidth = 25f
-            val topLeft = Offset((size.width - arcSize) / 2, (size.height - arcSize) / 2)
-
-            // Arco de fundo - AGORA USANDO A VARIÁVEL 'surfaceColor'
-            drawArc(
-                color = surfaceColor, // <-- CORREÇÃO
-                startAngle = 150f,
-                sweepAngle = 240f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = Size(arcSize, arcSize),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-
-            // Gradiente de cor para o arco principal
-            val brush = Brush.sweepGradient(
-                center = center,
-                colorStops = arrayOf(
-                    // O gradiente completo de 360°
-                    0.0f to Color.Red,
-                    0.416f to Color.Red,
-                    0.583f to Color.Yellow,
-                    0.75f to successGreen,
-                    0.916f to Color.Yellow,
-                    1.0f to Color.Red
-                )
-            )
-
-            // Arco colorido
-            drawArc(
-                brush = brush,
-                alpha = 0.6f,
-                startAngle = 150f,
-                sweepAngle = 240f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = Size(arcSize, arcSize),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-
-            // Desenha o ponteiro - USA A VARIÁVEL 'indicatorColor'
-            rotate(degrees = angle, pivot = center) {
-                drawLine(
-                    color = indicatorColor, // <-- CORREÇÃO
-                    start = Offset(center.x, center.y),
-                    end = Offset(center.x, topLeft.y - 10),
-                    strokeWidth = 8f,
-                    cap = StrokeCap.Round
-                )
-            }
-
-            // Pivô do ponteiro - USA AS VARIÁVEIS 'indicatorColor' E 'backgroundColor'
-            drawCircle(color = indicatorColor, radius = 12f, center = center) // <-- CORREÇÃO
-            drawCircle(color = backgroundColor, radius = 6f, center = center) // <-- CORREÇÃO
-        }
-    }
-}
-
 
 @Preview
 @Composable

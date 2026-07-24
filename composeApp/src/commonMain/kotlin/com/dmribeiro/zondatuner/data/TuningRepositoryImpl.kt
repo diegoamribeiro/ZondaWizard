@@ -39,16 +39,22 @@ class TuningRepositoryImpl(
             description = entity.description,
             string6Frequency = entity.string6Frequency,
             string6Note = entity.string6Note,
+            string6OctaveShift = entity.string6OctaveShift,
             string5Frequency = entity.string5Frequency,
             string5Note = entity.string5Note,
+            string5OctaveShift = entity.string5OctaveShift,
             string4Frequency = entity.string4Frequency,
             string4Note = entity.string4Note,
+            string4OctaveShift = entity.string4OctaveShift,
             string3Frequency = entity.string3Frequency,
             string3Note = entity.string3Note,
+            string3OctaveShift = entity.string3OctaveShift,
             string2Frequency = entity.string2Frequency,
             string2Note = entity.string2Note,
+            string2OctaveShift = entity.string2OctaveShift,
             string1Frequency = entity.string1Frequency,
-            string1Note = entity.string1Note
+            string1Note = entity.string1Note,
+            string1OctaveShift = entity.string1OctaveShift,
         )
     }
 
@@ -76,15 +82,15 @@ class TuningRepositoryImpl(
             ),
             Tuning(
                 id = 0,
-                name = "Drop D# (Charlie Brown Jr)",
-                description = "Drop D# do Charlie Brown Jr",
+                name = "Eb (Charlie Brown Jr)",
+                description = "Afinação em Eb (meio tom abaixo do padrão)",
                 strings = listOf(
-                    GuitarString(6, 77.78f, "Eb", 0),
-                    GuitarString(5, 103.83f, "Ab", 0),
-                    GuitarString(4, 138.59f, "Db", 0),
-                    GuitarString(3, 185.00f, "Gb", 0),
-                    GuitarString(2, 233.08f, "Bb", 0),
-                    GuitarString(1, 311.13f, "Eb", 0)
+                    GuitarString(6, 77.78f, "D#", 0),
+                    GuitarString(5, 103.83f, "G#", 0),
+                    GuitarString(4, 138.59f, "C#", 0),
+                    GuitarString(3, 185.00f, "F#", 0),
+                    GuitarString(2, 233.08f, "A#", 0),
+                    GuitarString(1, 311.13f, "D#", 0)
                 )
             ),
             Tuning(

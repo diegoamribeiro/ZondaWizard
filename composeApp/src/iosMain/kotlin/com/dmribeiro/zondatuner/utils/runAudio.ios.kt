@@ -1,12 +1,12 @@
 package com.dmribeiro.zondatuner.utils
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-@OptIn(DelicateCoroutinesApi::class)
+private val audioScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
 actual fun runAudio(block: suspend CoroutineScope.() -> Unit) {
-    GlobalScope.launch(Dispatchers.Main, block = block)
+    audioScope.launch(block = block)
 }

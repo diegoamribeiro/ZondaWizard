@@ -45,8 +45,7 @@ kotlin {
             implementation(libs.koin.androidx.compose)
             implementation(libs.koin.core)
             implementation("com.google.accompanist:accompanist-permissions:0.37.2")
-            //noinspection GradlePath
-            implementation(files("/Users/diegoribeiro/AndroidStudioProjects/ZondaWizard/composeApp/src/commonMain/libs/TarsosDSP-Android-latest.jar"))
+            implementation(files("src/commonMain/libs/TarsosDSP-Android-latest.jar"))
             implementation("com.soywiz.korlibs.korio:korio-android:$korioVersion")
         }
         commonMain.dependencies {
@@ -95,6 +94,10 @@ kotlin {
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
 
+        }
+
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
         }
     }
 }

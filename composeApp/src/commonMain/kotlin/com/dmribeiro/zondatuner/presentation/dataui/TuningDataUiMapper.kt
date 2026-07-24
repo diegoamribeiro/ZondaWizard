@@ -3,6 +3,7 @@ package com.dmribeiro.zondatuner.presentation.dataui
 import com.dmribeiro.zondatuner.domain.model.GuitarString
 import com.dmribeiro.zondatuner.domain.model.Tuning
 import com.dmribeiro.zondatuner.domain.data.local.TuningEntity
+import com.dmribeiro.zondatuner.utils.normalizeNote
 
 class TuningDataUiMapper {
 
@@ -12,38 +13,42 @@ class TuningDataUiMapper {
             name = entity.name,
             description = entity.description,
             strings = listOf(
-                GuitarString(6, entity.string6Frequency, entity.string6Note, 0),
-                GuitarString(5, entity.string5Frequency, entity.string5Note, 0),
-                GuitarString(4, entity.string4Frequency, entity.string4Note, 0),
-                GuitarString(3, entity.string3Frequency, entity.string3Note, 0),
-                GuitarString(2, entity.string2Frequency, entity.string2Note, 0),
-                GuitarString(1, entity.string1Frequency, entity.string1Note, 0)
+                GuitarString(6, entity.string6Frequency, normalizeNote(entity.string6Note), entity.string6OctaveShift),
+                GuitarString(5, entity.string5Frequency, normalizeNote(entity.string5Note), entity.string5OctaveShift),
+                GuitarString(4, entity.string4Frequency, normalizeNote(entity.string4Note), entity.string4OctaveShift),
+                GuitarString(3, entity.string3Frequency, normalizeNote(entity.string3Note), entity.string3OctaveShift),
+                GuitarString(2, entity.string2Frequency, normalizeNote(entity.string2Note), entity.string2OctaveShift),
+                GuitarString(1, entity.string1Frequency, normalizeNote(entity.string1Note), entity.string1OctaveShift),
             )
         )
     }
 
-    // 🔹 Converte de `Tuning` (domínio) para `TuningEntity` (banco de dados)
     fun toEntity(tuning: Tuning): TuningEntity {
         return TuningEntity(
             id = tuning.id,
             name = tuning.name,
             description = tuning.description ?: "",
             string6Frequency = tuning.strings[0].frequency,
-            string6Note = tuning.strings[0].note,
+            string6Note = normalizeNote(tuning.strings[0].note),
+            string6OctaveShift = tuning.strings[0].octaveShift,
             string5Frequency = tuning.strings[1].frequency,
-            string5Note = tuning.strings[1].note,
+            string5Note = normalizeNote(tuning.strings[1].note),
+            string5OctaveShift = tuning.strings[1].octaveShift,
             string4Frequency = tuning.strings[2].frequency,
-            string4Note = tuning.strings[2].note,
+            string4Note = normalizeNote(tuning.strings[2].note),
+            string4OctaveShift = tuning.strings[2].octaveShift,
             string3Frequency = tuning.strings[3].frequency,
-            string3Note = tuning.strings[3].note,
+            string3Note = normalizeNote(tuning.strings[3].note),
+            string3OctaveShift = tuning.strings[3].octaveShift,
             string2Frequency = tuning.strings[4].frequency,
-            string2Note = tuning.strings[4].note,
+            string2Note = normalizeNote(tuning.strings[4].note),
+            string2OctaveShift = tuning.strings[4].octaveShift,
             string1Frequency = tuning.strings[5].frequency,
-            string1Note = tuning.strings[5].note
+            string1Note = normalizeNote(tuning.strings[5].note),
+            string1OctaveShift = tuning.strings[5].octaveShift,
         )
     }
 
-    // 🔹 Converte `Tuning` (domínio) para `TuningDataUi` (UI)
     fun toObject(domainModel: Tuning): TuningDataUi {
         return TuningDataUi(
             id = domainModel.id,
@@ -53,14 +58,13 @@ class TuningDataUiMapper {
                 GuitarString(
                     number = guitarString.number,
                     frequency = guitarString.frequency,
-                    note = guitarString.note,
+                    note = normalizeNote(guitarString.note),
                     octaveShift = guitarString.octaveShift
                 )
             }
         )
     }
 
-    // 🔹 Converte `TuningDataUi` (UI) para `Tuning` (domínio)
     fun fromObject(dataUi: TuningDataUi): Tuning {
         return Tuning(
             id = dataUi.id,
@@ -70,7 +74,7 @@ class TuningDataUiMapper {
                 GuitarString(
                     number = guitarString.number,
                     frequency = guitarString.frequency,
-                    note = guitarString.note,
+                    note = normalizeNote(guitarString.note),
                     octaveShift = guitarString.octaveShift
                 )
             }
