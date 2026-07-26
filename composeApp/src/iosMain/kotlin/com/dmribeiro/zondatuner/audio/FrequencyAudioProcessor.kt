@@ -16,9 +16,6 @@ actual class FrequencyAudioProcessor actual constructor(
     companion object {
         private const val SAMPLE_RATE = 44_100.0
         private const val BUFFER_SIZE = 2_048u
-        private const val MIN_RMS = 0.0015f
-        private const val MIN_FREQUENCY = 40f
-        private const val MAX_FREQUENCY = 1_500f
     }
 
     @OptIn(ExperimentalForeignApi::class)
@@ -45,7 +42,7 @@ actual class FrequencyAudioProcessor actual constructor(
             inputNode = eng.inputNode
 
             val hwFmt = inputNode!!.inputFormatForBus(0u)
-            yinPitchDetector = YinPitchDetector(hwFmt.sampleRate.toFloat())
+            yinPitchDetector = createDetector(hwFmt.sampleRate.toFloat())
             val tapFmt = AVAudioFormat(
                 commonFormat = AVAudioPCMFormatFloat32.toULong(),
                 sampleRate = hwFmt.sampleRate,
@@ -77,14 +74,21 @@ actual class FrequencyAudioProcessor actual constructor(
 
         val samples = FloatArray(len) { i -> channelData[i] }
         val rms = calculateRms(samples)
-        if (rms < MIN_RMS) return
+        if (rms < PitchDetectionConfig.MIN_RMS) return
 
-        val detector = yinPitchDetector ?: YinPitchDetector(buffer.format.sampleRate.toFloat())
+        val detector = yinPitchDetector ?: createDetector(buffer.format.sampleRate.toFloat())
         val freq = detector.detectPitch(samples)
-        if (freq in MIN_FREQUENCY..MAX_FREQUENCY) {
+        if (freq in PitchDetectionConfig.MIN_FREQUENCY..PitchDetectionConfig.MAX_FREQUENCY) {
             onFrequencyDetected(freq)
         }
     }
+
+    private fun createDetector(sampleRate: Float) = YinPitchDetector(
+        sampleRate = sampleRate,
+        threshold = PitchDetectionConfig.YIN_THRESHOLD,
+        minFrequency = PitchDetectionConfig.MIN_FREQUENCY,
+        maxFrequency = PitchDetectionConfig.MAX_FREQUENCY,
+    )
 
     private fun calculateRms(samples: FloatArray): Float {
         var sum = 0.0

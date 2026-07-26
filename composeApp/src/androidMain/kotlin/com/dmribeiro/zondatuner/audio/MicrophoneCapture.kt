@@ -19,7 +19,6 @@ actual class MicrophoneCapture actual constructor(
                 )
 
                 frequencyAudioProcessor = FrequencyAudioProcessor { frequency ->
-                    println("📡 Frequência Detectada: $frequency Hz")
                     onFrequencyDetected(frequency)
                 }
 

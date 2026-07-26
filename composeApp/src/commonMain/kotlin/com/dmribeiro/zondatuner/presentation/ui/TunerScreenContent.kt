@@ -2,7 +2,7 @@ package com.dmribeiro.zondatuner.presentation.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
@@ -13,9 +13,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
@@ -41,12 +44,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import com.dmribeiro.zondatuner.audio.MicrophoneCapture
+import com.dmribeiro.zondatuner.audio.StringAutoDetector
+import com.dmribeiro.zondatuner.audio.TunerDiagnostics
 import com.dmribeiro.zondatuner.audio.TunerReadingHold
 import com.dmribeiro.zondatuner.audio.createPitchSmoother
 import com.dmribeiro.zondatuner.domain.model.GuitarString
@@ -56,15 +65,22 @@ import com.dmribeiro.zondatuner.permissions.getPermissionHandler
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
 import com.dmribeiro.zondatuner.presentation.viewmodel.HomeScreenModel
 import com.dmribeiro.zondatuner.theme.ZondaTheme
-import com.dmribeiro.zondatuner.utils.runAudio
+import com.dmribeiro.zondatuner.utils.GAUGE_CENTS_RANGE
+import com.dmribeiro.zondatuner.utils.alignFrequencyToTargetOctave
+import com.dmribeiro.zondatuner.utils.formatTunerHz
+import com.dmribeiro.zondatuner.utils.frequencyDeltaCents
+import com.dmribeiro.zondatuner.utils.isPlausibleTunerReading
+import com.dmribeiro.zondatuner.utils.findBestStringMatch
+import com.dmribeiro.zondatuner.utils.targetHzForMatch
+import com.dmribeiro.zondatuner.utils.centsToGaugeAngleDegrees
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import kotlin.math.PI
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.log2
 import kotlin.math.min
-import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.time.TimeSource
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -150,6 +166,7 @@ fun TunerScreenWithAudio(
     var isTwelfthFretMode by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var selectedStringIndex by remember { mutableStateOf(6) }
+    var manualStringLock by remember { mutableStateOf(false) }
 
     val navigator = LocalNavigator.current
     val menuActions = LocalTopBarMenuActions.current
@@ -167,39 +184,25 @@ fun TunerScreenWithAudio(
         viewModel.markTuningUsed(currentTuning.id)
     }
 
+    val timeSource = TimeSource.Monotonic
     val pitchSmoother = remember { createPitchSmoother() }
     val readingHold = remember { TunerReadingHold() }
-    val timeSource = TimeSource.Monotonic
+    val tunerDiagnostics = remember { TunerDiagnostics(timeSource = timeSource) }
+    val stringAutoDetector = remember { StringAutoDetector() }
+    // CONFLATED: mantém só a leitura mais recente, evita fila e corrida na Main.
+    val frequencyUpdates = remember { Channel<Float>(Channel.CONFLATED) }
 
-    val audioProcessor = remember {
+    val audioProcessor = remember(frequencyUpdates) {
         MicrophoneCapture { freq ->
-            runAudio {
-                val now = timeSource.markNow()
-                val smoothed = pitchSmoother.add(freq)
-                readingHold.update(smoothed, now)
-                detectedFrequency = readingHold.heldFrequency
-                signalActive = readingHold.isReceivingSignal(now)
-            }
+            frequencyUpdates.trySend(freq)
         }
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(audioProcessor, frequencyUpdates) {
         audioProcessor.start()
-        onDispose { audioProcessor.stop() }
-    }
-
-    // Só limpa depois de silêncio prolongado; falhas curtas mantêm o ponteiro estável.
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(400)
-            val now = timeSource.markNow()
-            signalActive = readingHold.isReceivingSignal(now)
-            if (readingHold.shouldClear(now) && detectedFrequency > 0f) {
-                readingHold.reset()
-                pitchSmoother.reset()
-                detectedFrequency = 0f
-                signalActive = false
-            }
+        onDispose {
+            audioProcessor.stop()
+            frequencyUpdates.close()
         }
     }
 
@@ -208,6 +211,97 @@ fun TunerScreenWithAudio(
     val targetFrequency =
         if (isTwelfthFretMode) selectedString.frequency * 2 else selectedString.frequency
     val targetNote = selectedString.note
+    val currentTarget by rememberUpdatedState(targetFrequency)
+    val currentStrings by rememberUpdatedState(currentTuning.getGuitarStrings())
+    val manualLock by rememberUpdatedState(manualStringLock)
+    val currentSelectedString by rememberUpdatedState(selectedStringIndex)
+    val currentTwelfthMode by rememberUpdatedState(isTwelfthFretMode)
+
+    // Pipeline serializado: evita corrida entre callbacks concorrentes (Android ~40/s).
+    LaunchedEffect(frequencyUpdates) {
+        for (freq in frequencyUpdates) {
+            val now = timeSource.markNow()
+
+            if (freq > 0f) {
+                val strings = currentStrings
+                val processingTargetHz = if (manualLock) {
+                    val string = strings.find { it.number == currentSelectedString } ?: strings.first()
+                    if (currentTwelfthMode) string.frequency * 2f else string.frequency
+                } else {
+                    findBestStringMatch(freq, strings)?.let { match ->
+                        targetHzForMatch(match, strings)
+                    } ?: run {
+                        val string = strings.find { it.number == currentSelectedString } ?: strings.first()
+                        if (currentTwelfthMode) string.frequency * 2f else string.frequency
+                    }
+                }
+                val alignedRaw = alignFrequencyToTargetOctave(freq, processingTargetHz)
+                if (isPlausibleTunerReading(alignedRaw, processingTargetHz)) {
+                    val smoothed = pitchSmoother.add(alignedRaw)
+                    if (isPlausibleTunerReading(smoothed, processingTargetHz)) {
+                        readingHold.update(smoothed, now)
+                    }
+                }
+            }
+        }
+    }
+
+    // Atualiza UI em intervalo fixo — independente do loop de áudio (que pode bloquear no Channel).
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(50)
+            val now = timeSource.markNow()
+            signalActive = readingHold.isReceivingSignal(now)
+            val uiHz = if (signalActive) readingHold.heldFrequency else 0f
+            detectedFrequency = uiHz
+
+            if (!manualStringLock && uiHz > 0f) {
+                stringAutoDetector.evaluate(uiHz, currentTuning.getGuitarStrings())?.let { match ->
+                    if (match.stringNumber != selectedStringIndex) {
+                        selectedStringIndex = match.stringNumber
+                    }
+                }
+            }
+
+            if (TunerDiagnostics.isEnabled && uiHz > 0f) {
+                val aligned = alignFrequencyToTargetOctave(uiHz, currentTarget)
+                val uiCents = if (aligned > 0f && currentTarget > 0f) {
+                    frequencyDeltaCents(aligned, currentTarget)
+                } else {
+                    0f
+                }
+                tunerDiagnostics.onPipeline(
+                    rawHz = uiHz,
+                    smoothedHz = uiHz,
+                    heldHz = uiHz,
+                    uiHz = uiHz,
+                    targetHz = currentTarget,
+                    signalActive = signalActive,
+                    inTune = abs(uiCents) < 5f,
+                )
+            }
+        }
+    }
+
+    // Só limpa depois de silêncio prolongado; falhas curtas mantêm o ponteiro estável.
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(400)
+            val now = timeSource.markNow()
+            signalActive = readingHold.isReceivingSignal(now)
+            if (!signalActive && detectedFrequency > 0f) {
+                detectedFrequency = 0f
+            }
+            if (readingHold.shouldClear(now)) {
+                readingHold.reset()
+                pitchSmoother.reset()
+                stringAutoDetector.reset()
+                manualStringLock = false
+                detectedFrequency = 0f
+                signalActive = false
+            }
+        }
+    }
 
     // Troca de corda/modo/afinação: descarta histórico para não arrastar valores antigos.
     LaunchedEffect(currentTuning, selectedStringIndex, isTwelfthFretMode) {
@@ -217,8 +311,9 @@ fun TunerScreenWithAudio(
         signalActive = false
     }
 
-    val cents = if (detectedFrequency > 0f && targetFrequency > 0f) {
-        (1200 * log2(detectedFrequency / targetFrequency)).toFloat()
+    val alignedFrequency = alignFrequencyToTargetOctave(detectedFrequency, targetFrequency)
+    val cents = if (alignedFrequency > 0f && targetFrequency > 0f) {
+        frequencyDeltaCents(alignedFrequency, targetFrequency)
     } else {
         0f
     }
@@ -230,80 +325,130 @@ fun TunerScreenWithAudio(
         label = "inTuneBorder",
     )
 
-    Box(
+    val allTunings by viewModel.tuningState.listState.collectAsState()
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .border(width = 3.dp, color = inTuneBorderColor),
+            .padding(4.dp)
+            .border(
+                width = 5.dp,
+                color = inTuneBorderColor,
+                shape = MaterialTheme.shapes.medium,
+            ),
     ) {
+        val isLandscape = maxWidth > maxHeight
+        val landscapeGaugeHeight = minOf(maxHeight * 0.52f, maxWidth * 0.36f).coerceIn(130.dp, 200.dp)
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(vertical = 4.dp),
         ) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                val allTunings by viewModel.tuningState.listState.collectAsState()
-                TuningSelectorDropdown(
-                    current = currentTuning,
-                    tunings = allTunings,
-                    onSelected = { selected ->
-                        currentTuning = selected
-                        selectedStringIndex = 6
-                        isTwelfthFretMode = false
-                    },
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
-
-                if (isTwelfthFretMode) {
-                    Text(
-                        text = "Modo 12ª casa — todas as cordas na oitava",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = ZondaTheme.extended.twelfthFret,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center,
-                    )
-                } else {
-                    Text(
-                        text = "Segure a palheta para afinar na 12ª casa",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            TunerDisplay(
-                detectedFrequency = detectedFrequency,
-                targetFrequency = targetFrequency,
-                targetNote = targetNote,
-                signalActive = signalActive,
-                isInTune = isInTune,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp)
-                    .padding(bottom = 8.dp),
+            TunerScreenHeader(
+                currentTuning = currentTuning,
+                allTunings = allTunings,
+                isTwelfthFretMode = isTwelfthFretMode,
+                manualStringLock = manualStringLock,
+                onTuningSelected = { selected ->
+                    currentTuning = selected
+                    selectedStringIndex = 6
+                    isTwelfthFretMode = false
+                    manualStringLock = false
+                    stringAutoDetector.reset()
+                },
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 4.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(0.42f)
+                            .fillMaxHeight()
+                            .padding(end = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TunerDisplay(
+                            detectedFrequency = detectedFrequency,
+                            targetFrequency = targetFrequency,
+                            targetNote = targetNote,
+                            signalActive = signalActive,
+                            isInTune = isInTune,
+                            diagnostics = tunerDiagnostics,
+                            gaugeHeight = landscapeGaugeHeight,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 320.dp),
+                        )
+                    }
 
-            // Cordas invertidas: palhetas perto do afinador, nut na base da tela.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 4.dp),
-            ) {
-                GuitarStringsSelector(
-                    tuning = currentTuning,
-                    selectedString = selectedStringIndex,
-                    isTwelfthFretMode = isTwelfthFretMode,
-                    onStringSelected = { selectedStringIndex = it },
-                    onToggleTwelfthFretMode = { isTwelfthFretMode = !isTwelfthFretMode },
-                    inverted = true,
-                    modifier = Modifier.fillMaxSize(),
+                    Box(
+                        modifier = Modifier
+                            .weight(0.58f)
+                            .fillMaxHeight(),
+                    ) {
+                        GuitarStringsSelector(
+                            tuning = currentTuning,
+                            selectedString = selectedStringIndex,
+                            isTwelfthFretMode = isTwelfthFretMode,
+                            onStringSelected = {
+                                manualStringLock = true
+                                selectedStringIndex = it
+                            },
+                            onToggleTwelfthFretMode = {
+                                manualStringLock = true
+                                isTwelfthFretMode = !isTwelfthFretMode
+                            },
+                            inverted = true,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TunerDisplay(
+                    detectedFrequency = detectedFrequency,
+                    targetFrequency = targetFrequency,
+                    targetNote = targetNote,
+                    signalActive = signalActive,
+                    isInTune = isInTune,
+                    diagnostics = tunerDiagnostics,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                        .padding(bottom = 8.dp),
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 4.dp),
+                ) {
+                    GuitarStringsSelector(
+                        tuning = currentTuning,
+                        selectedString = selectedStringIndex,
+                        isTwelfthFretMode = isTwelfthFretMode,
+                        onStringSelected = {
+                            manualStringLock = true
+                            selectedStringIndex = it
+                        },
+                        onToggleTwelfthFretMode = {
+                            manualStringLock = true
+                            isTwelfthFretMode = !isTwelfthFretMode
+                        },
+                        inverted = true,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }
@@ -335,6 +480,55 @@ fun TunerScreenWithAudio(
                 }
             }
         )
+    }
+}
+
+/** Dropdown da afinação + dica do modo 12ª casa. */
+@Composable
+private fun TunerScreenHeader(
+    currentTuning: TuningDataUi,
+    allTunings: List<TuningDataUi>,
+    isTwelfthFretMode: Boolean,
+    manualStringLock: Boolean,
+    onTuningSelected: (TuningDataUi) -> Unit,
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        TuningSelectorDropdown(
+            current = currentTuning,
+            tunings = allTunings,
+            onSelected = onTuningSelected,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+
+        when {
+            isTwelfthFretMode -> {
+                Text(
+                    text = "Modo 12ª casa — todas as cordas na oitava",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = ZondaTheme.extended.twelfthFret,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
+            manualStringLock -> {
+                Text(
+                    text = "Segure a palheta para afinar na 12ª casa",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
+            else -> {
+                Text(
+                    text = "Toque uma corda — detecção automática · segure a palheta para 12ª casa",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
     }
 }
 
@@ -402,18 +596,37 @@ fun TunerDisplay(
     signalActive: Boolean,
     isInTune: Boolean,
     modifier: Modifier = Modifier,
+    gaugeHeight: Dp = 200.dp,
+    diagnostics: TunerDiagnostics? = null,
 ) {
-    val cents = if (detectedFrequency > 0f && targetFrequency > 0f) {
-        (1200 * log2(detectedFrequency / targetFrequency)).toFloat()
+    val alignedFrequency = alignFrequencyToTargetOctave(detectedFrequency, targetFrequency)
+    val cents = if (alignedFrequency > 0f && targetFrequency > 0f) {
+        frequencyDeltaCents(alignedFrequency, targetFrequency)
     } else {
         0f
     }
-    val clampedCents = cents.coerceIn(-50f, 50f)
+    val needleTargetCents = cents.coerceIn(-GAUGE_CENTS_RANGE, GAUGE_CENTS_RANGE)
 
-    val animatedCents by animateFloatAsState(
-        targetValue = clampedCents,
-        animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
-    )
+    val needleCents = remember { Animatable(0f) }
+    LaunchedEffect(needleTargetCents, detectedFrequency > 0f) {
+        if (detectedFrequency <= 0f) {
+            needleCents.animateTo(
+                0f,
+                animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+            )
+            diagnostics?.onNeedleTarget(0f, snapped = false)
+        } else {
+            needleCents.animateTo(
+                needleTargetCents,
+                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+            )
+            diagnostics?.onNeedleTarget(needleTargetCents, snapped = false)
+        }
+    }
+
+    LaunchedEffect(needleCents.value, diagnostics) {
+        diagnostics?.onNeedleFrame(needleCents.value)
+    }
 
     val noteColor = if (isInTune) ZondaTheme.extended.success else MaterialTheme.colorScheme.primary
 
@@ -424,15 +637,28 @@ fun TunerDisplay(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp),
+                .height(gaugeHeight),
             contentAlignment = Alignment.BottomCenter,
         ) {
             CentsGauge(
-                cents = animatedCents,
+                cents = needleCents.value,
                 isInTune = isInTune,
                 hasSignal = detectedFrequency > 0f,
                 modifier = Modifier.fillMaxSize(),
             )
+
+            if (TunerDiagnostics.isEnabled && diagnostics != null) {
+                diagnostics.snapshot // observa atualizações do diagnóstico
+                Text(
+                    text = diagnostics.formatOverlay(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp),
+                )
+            }
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -444,13 +670,13 @@ fun TunerDisplay(
                     color = noteColor,
                 )
 
-                val detectedText = if (detectedFrequency > 0f) {
-                    "${detectedFrequency.roundToInt()} Hz"
+                val detectedText = if (signalActive && detectedFrequency > 0f) {
+                    detectedFrequency.formatTunerHz()
                 } else {
                     "--- Hz"
                 }
                 Text(
-                    text = "$detectedText / ${targetFrequency.roundToInt()} Hz",
+                    text = "$detectedText / ${targetFrequency.formatTunerHz()}",
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -479,7 +705,7 @@ fun TunerDisplay(
 
 /**
  * Arco de -50 a +50 cents: trilha discreta, zona central de "afinado",
- * traços de escala e ponteiro dourado.
+ * traços de escala e ponteiro com haste fina, losango na ponta e hub dourado/branco.
  */
 @Composable
 private fun CentsGauge(
@@ -499,13 +725,13 @@ private fun CentsGauge(
         val radius = min(size.width / 2f - 2.dp.toPx(), size.height * 0.90f)
 
         // -50 cents → 180° (esquerda), 0 → 270° (topo), +50 → 360° (direita)
-        fun angleDegrees(c: Float) = 180f + (c + 50f) / 100f * 180f
+        fun angleDegrees(c: Float) = centsToGaugeAngleDegrees(c)
         fun pointAt(angleDeg: Float, r: Float): Offset {
             val rad = angleDeg * PI.toFloat() / 180f
             return Offset(cx + r * cos(rad), cy + r * sin(rad))
         }
 
-        val arcStroke = 6.dp.toPx()
+        val arcStroke = 11.25.dp.toPx()
         val arcRect = androidx.compose.ui.geometry.Rect(
             left = cx - radius, top = cy - radius,
             right = cx + radius, bottom = cy + radius
@@ -547,25 +773,49 @@ private fun CentsGauge(
             )
         }
 
-        // Ponteiro — origem no centro focal (perto da nota)
+        // Ponteiro: haste fina + losango na ponta, preso ao hub central.
+        val hubGoldRadius = 7.dp.toPx()
+        val hubWhiteRadius = 4.5.dp.toPx()
+        val hubCenter = Offset(cx, cy)
+
+        drawCircle(
+            color = needleColor,
+            radius = hubGoldRadius,
+            center = hubCenter,
+        )
+
         if (hasSignal) {
             val needleAngle = angleDegrees(cents)
-            val needleStart = radius * 0.22f
-            val needleEnd = radius - arcStroke - 10.dp.toPx()
+            val needleColorActive = if (isInTune) successColor else needleColor
+            val tipRadius = radius - arcStroke - 10.dp.toPx()
+            val diamondLength = 7.dp.toPx()
+            val shaftEndRadius = tipRadius - diamondLength
+            val wingSpreadDeg = 2.1f
+
             drawLine(
-                color = if (isInTune) successColor else needleColor,
-                start = pointAt(needleAngle, needleStart),
-                end = pointAt(needleAngle, needleEnd),
-                strokeWidth = 3.5.dp.toPx(),
-                cap = StrokeCap.Round,
+                color = needleColorActive,
+                start = pointAt(needleAngle, hubWhiteRadius),
+                end = pointAt(needleAngle, shaftEndRadius),
+                strokeWidth = 4.dp.toPx(),
+                cap = StrokeCap.Butt,
             )
+
+            val tip = pointAt(needleAngle, tipRadius)
+            val wingLeft = pointAt(needleAngle - wingSpreadDeg, shaftEndRadius)
+            val wingRight = pointAt(needleAngle + wingSpreadDeg, shaftEndRadius)
+            val diamondPath = Path().apply {
+                moveTo(tip.x, tip.y)
+                lineTo(wingLeft.x, wingLeft.y)
+                lineTo(wingRight.x, wingRight.y)
+                close()
+            }
+            drawPath(diamondPath, needleColorActive)
         }
 
-        // Marcador central (0 cents)
         drawCircle(
-            color = if (isInTune) successColor else needleColor.copy(alpha = 0.6f),
-            radius = 3.dp.toPx(),
-            center = Offset(cx, cy),
+            color = Color.White,
+            radius = hubWhiteRadius,
+            center = hubCenter,
         )
     }
 }

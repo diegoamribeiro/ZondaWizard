@@ -5,8 +5,9 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeMark
 
 /**
- * Mantém a última leitura válida por um tempo, evitando que o ponteiro
- * "pule" para o centro quando há pequenas falhas na detecção (comum no iOS).
+ * Mantém a última leitura válida por um curto período (signalTimeout),
+ * evitando que o ponteiro "pule" em falhas breves de detecção.
+ * Após signalTimeout sem novas leituras, a UI zera o valor exibido.
  */
 class TunerReadingHold(
     private val signalTimeout: Duration = 2.5.seconds,

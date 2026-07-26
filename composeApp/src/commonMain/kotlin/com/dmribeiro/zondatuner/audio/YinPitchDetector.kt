@@ -6,9 +6,9 @@ package com.dmribeiro.zondatuner.audio
  */
 class YinPitchDetector(
     private val sampleRate: Float,
-    private val threshold: Float = 0.15f,
-    private val minFrequency: Float = 50f,
-    private val maxFrequency: Float = 1000f
+    private val threshold: Float = PitchDetectionConfig.YIN_THRESHOLD,
+    private val minFrequency: Float = PitchDetectionConfig.MIN_FREQUENCY,
+    private val maxFrequency: Float = PitchDetectionConfig.MAX_FREQUENCY,
 ) {
     fun detectPitch(samples: FloatArray): Float {
         if (samples.size < 4) return 0f
