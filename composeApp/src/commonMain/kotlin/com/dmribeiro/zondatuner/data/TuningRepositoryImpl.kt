@@ -4,6 +4,7 @@ import com.dmribeiro.zondatuner.data.local.AppDatabase
 import com.dmribeiro.zondatuner.domain.model.GuitarString
 import com.dmribeiro.zondatuner.domain.model.Tuning
 import com.dmribeiro.zondatuner.domain.repository.TuningRepository
+import com.dmribeiro.zondatuner.domain.util.sortedForDisplay
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUiMapper
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -18,12 +19,18 @@ class TuningRepositoryImpl(
 
     override fun getAllTunings(): Flow<List<Tuning>> {
         return dao.getAllTunings().map { entityList ->
-            entityList.map { entity -> mapper.fromEntity(entity) }
+            entityList
+                .map { entity -> mapper.fromEntity(entity) }
+                .sortedForDisplay()
         }
     }
 
     override suspend fun deleteTuning(id: Long) {
         dao.deleteTuning(id)
+    }
+
+    override suspend fun markTuningUsed(id: Long) {
+        dao.markUsed(id)
     }
 
     override suspend fun insertTuning(tuning: Tuning) {

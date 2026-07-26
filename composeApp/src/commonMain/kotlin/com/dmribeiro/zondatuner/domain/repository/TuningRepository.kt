@@ -8,5 +8,6 @@ interface TuningRepository {
     suspend fun insertTuning(tuning: Tuning)
     suspend fun deleteTuning(id: Long)
     suspend fun updateTuning(tuning: Tuning)
+    suspend fun markTuningUsed(id: Long)
     suspend fun ensureInitialTuningsInserted()
 }

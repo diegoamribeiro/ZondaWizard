@@ -26,4 +26,5 @@ data class TuningEntity(
     val string1Frequency: Float,
     val string1Note: String,
     val string1OctaveShift: Int = 0,
+    val lastUsedAt: Long = 0,
 )

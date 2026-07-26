@@ -5,6 +5,7 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import com.dmribeiro.zondatuner.domain.usecase.DeleteTuningUseCase
 import com.dmribeiro.zondatuner.domain.usecase.GetTuningsUseCase
 import com.dmribeiro.zondatuner.domain.usecase.InsertTuningUseCase
+import com.dmribeiro.zondatuner.domain.usecase.MarkTuningUsedUseCase
 import com.dmribeiro.zondatuner.domain.usecase.SeedTuningsUseCase
 import com.dmribeiro.zondatuner.domain.usecase.UpdateTuningUseCase
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
@@ -19,7 +20,8 @@ class HomeScreenModel(
     private val deleteTuningUseCase: DeleteTuningUseCase,
     private val tuningDataUiMapper: TuningDataUiMapper,
     private val updateTuningUseCase: UpdateTuningUseCase,
-    private val seedTuningsUseCase: SeedTuningsUseCase
+    private val seedTuningsUseCase: SeedTuningsUseCase,
+    private val markTuningUsedUseCase: MarkTuningUsedUseCase,
 ) : ScreenModel {
 
     val tuningState = TuningStateUI()
@@ -77,6 +79,16 @@ class HomeScreenModel(
             try {
                 deleteTuningUseCase(id)
                 loadTunings()
+            } catch (e: Exception) {
+                tuningState.error = e
+            }
+        }
+    }
+
+    fun markTuningUsed(id: Long) {
+        screenModelScope.launch {
+            try {
+                markTuningUsedUseCase(id)
             } catch (e: Exception) {
                 tuningState.error = e
             }

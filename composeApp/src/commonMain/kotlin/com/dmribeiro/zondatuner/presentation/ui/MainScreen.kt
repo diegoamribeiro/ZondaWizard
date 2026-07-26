@@ -3,6 +3,7 @@ package com.dmribeiro.zondatuner.presentation.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -24,6 +25,7 @@ fun MainScreen() {
             val currentScreen = navigator.lastItem as? AppDestination
 
             Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
                 topBar = {
                     if (currentScreen !is AppDestination.SplashScreen) {
                         currentScreen?.let {

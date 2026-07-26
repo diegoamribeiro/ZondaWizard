@@ -10,87 +10,125 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.Font
 import zondawizard.composeapp.generated.resources.*
 
-/**
- * Função Composable privada que carrega os arquivos de fonte e os "lembra"
- * em uma instância de FontFamily. Esta é a maneira correta de lidar
- * com a chamada à função Font() que também é @Composable.
- */
 @Composable
 private fun rememberMontserratFontFamily(): FontFamily {
-    // Carrega cada arquivo de fonte associando-o ao seu peso (FontWeight) correto.
+    val light = Font(Res.font.montserrat_light, FontWeight.Light)
     val regular = Font(Res.font.montserrat_regular, FontWeight.Normal)
     val medium = Font(Res.font.montserrat_medium, FontWeight.Medium)
     val semiBold = Font(Res.font.montserrat_semibold, FontWeight.SemiBold)
     val bold = Font(Res.font.montserrat_bold, FontWeight.Bold)
+    val extraBold = Font(Res.font.montserrat_extrabold, FontWeight.ExtraBold)
 
-    // A função 'remember' garante que a FontFamily não seja recriada em cada recomposição,
-    // otimizando a performance.
-    return remember(regular, medium, semiBold, bold) {
-        FontFamily(
-            fonts = listOf(regular, medium, semiBold, bold)
-        )
+    return remember(light, regular, medium, semiBold, bold, extraBold) {
+        FontFamily(fonts = listOf(light, regular, medium, semiBold, bold, extraBold))
     }
 }
 
-/**
- * Esta é a função pública que você usará no seu MaterialTheme.
- * Ela obtém a família de fontes e constrói um objeto Typography completo.
- */
+/** Numerais tabulares: frequências não "pulam" quando o valor muda. */
+private const val TABULAR_NUMBERS = "tnum"
+
 @Composable
 fun AppTypography(): Typography {
-    val montserratFamily = rememberMontserratFontFamily()
+    val montserrat = rememberMontserratFontFamily()
 
-    // Usamos 'remember' novamente para que todos os objetos Typography seja cacheado.
-    return remember(montserratFamily) {
+    return remember(montserrat) {
         Typography(
-            // Títulos de tela (ex: "Minhas Afinações")
+            // Nota gigante do afinador
+            displayLarge = TextStyle(
+                fontFamily = montserrat,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 96.sp,
+                lineHeight = 100.sp,
+                letterSpacing = (-1).sp,
+            ),
+            // Nota em contextos menores (preview, seleção)
+            displayMedium = TextStyle(
+                fontFamily = montserrat,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 56.sp,
+                lineHeight = 60.sp,
+                letterSpacing = 0.sp,
+            ),
+            // Títulos de tela
             headlineLarge = TextStyle(
-                fontFamily = montserratFamily,
+                fontFamily = montserrat,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 32.sp,
                 lineHeight = 40.sp,
-                letterSpacing = 0.sp
+                letterSpacing = 0.sp,
             ),
-            // Títulos de seção (ex: "Editar Afinação")
+            // Títulos da top bar e seções
             titleLarge = TextStyle(
-                fontFamily = montserratFamily,
+                fontFamily = montserrat,
                 fontWeight = FontWeight.Bold,
                 fontSize = 22.sp,
                 lineHeight = 28.sp,
-                letterSpacing = 0.sp
+                letterSpacing = 0.sp,
             ),
-            // Texto principal do corpo
+            // Nome de card, subtítulos importantes
+            titleMedium = TextStyle(
+                fontFamily = montserrat,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 18.sp,
+                lineHeight = 24.sp,
+                letterSpacing = 0.sp,
+            ),
+            // Frequências (Hz) — numerais tabulares
+            titleSmall = TextStyle(
+                fontFamily = montserrat,
+                fontWeight = FontWeight.Medium,
+                fontSize = 16.sp,
+                lineHeight = 22.sp,
+                letterSpacing = 0.5.sp,
+                fontFeatureSettings = TABULAR_NUMBERS,
+            ),
+            // Corpo principal
             bodyLarge = TextStyle(
-                fontFamily = montserratFamily,
+                fontFamily = montserrat,
                 fontWeight = FontWeight.Normal,
                 fontSize = 16.sp,
                 lineHeight = 24.sp,
-                letterSpacing = 0.5.sp
+                letterSpacing = 0.5.sp,
             ),
-            // Texto em botões
-            labelLarge = TextStyle(
-                fontFamily = montserratFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                letterSpacing = 0.1.sp
-            ),
-            // Texto de corpo um pouco menor ou secundário
+            // Corpo secundário
             bodyMedium = TextStyle(
-                fontFamily = montserratFamily,
+                fontFamily = montserrat,
                 fontWeight = FontWeight.Normal,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
-                letterSpacing = 0.25.sp
+                letterSpacing = 0.25.sp,
             ),
-            // Legendas e textos pequenos
+            bodySmall = TextStyle(
+                fontFamily = montserrat,
+                fontWeight = FontWeight.Normal,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                letterSpacing = 0.4.sp,
+            ),
+            // Botões
+            labelLarge = TextStyle(
+                fontFamily = montserrat,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                letterSpacing = 0.1.sp,
+            ),
+            // Dicas, hints, chips
+            labelMedium = TextStyle(
+                fontFamily = montserrat,
+                fontWeight = FontWeight.Medium,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                letterSpacing = 0.5.sp,
+            ),
+            // Legendas mínimas, badges
             labelSmall = TextStyle(
-                fontFamily = montserratFamily,
+                fontFamily = montserrat,
                 fontWeight = FontWeight.Medium,
                 fontSize = 11.sp,
                 lineHeight = 16.sp,
-                letterSpacing = 0.5.sp
-            )
+                letterSpacing = 0.5.sp,
+            ),
         )
     }
 }

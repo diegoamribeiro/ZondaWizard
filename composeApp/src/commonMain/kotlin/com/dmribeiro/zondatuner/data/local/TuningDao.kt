@@ -18,6 +18,10 @@ interface TuningDao {
     @Query("DELETE FROM tunings WHERE id = :id")
     suspend fun deleteTuning(id: Long)
 
+    // Contador crescente em vez de relógio: só a ordem importa.
+    @Query("UPDATE tunings SET lastUsedAt = (SELECT IFNULL(MAX(lastUsedAt), 0) + 1 FROM tunings) WHERE id = :id")
+    suspend fun markUsed(id: Long)
+
     @Query(
         """
     UPDATE tunings 

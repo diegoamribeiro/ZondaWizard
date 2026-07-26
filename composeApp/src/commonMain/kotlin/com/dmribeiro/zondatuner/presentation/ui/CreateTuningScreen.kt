@@ -61,7 +61,7 @@ fun CreateTuningScreenContent(
                 onValueChange = { name = it },
                 label = { Text("Nome da Afinação") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
+                shape = MaterialTheme.shapes.small,
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -79,7 +79,7 @@ fun CreateTuningScreenContent(
                 onValueChange = { description = it },
                 label = { Text("Descrição (Opcional)") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
+                shape = MaterialTheme.shapes.small,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -88,6 +88,14 @@ fun CreateTuningScreenContent(
                     focusedLabelColor = MaterialTheme.colorScheme.primary,
                     unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Preview ao vivo das 6 notas da afinação sendo editada
+            TuningNotesRow(
+                strings = stringsState,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -156,7 +164,7 @@ fun TuningStringRow(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(

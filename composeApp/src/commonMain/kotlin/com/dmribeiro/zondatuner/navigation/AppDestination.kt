@@ -11,14 +11,17 @@ import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import com.dmribeiro.zondatuner.navigation.LocalTopBarMenuActions
+import com.dmribeiro.zondatuner.domain.usecase.GetTuningsUseCase
 import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUi
+import com.dmribeiro.zondatuner.presentation.dataui.TuningDataUiMapper
 import com.dmribeiro.zondatuner.presentation.ui.CreateTuningScreenContent
 import com.dmribeiro.zondatuner.presentation.ui.HomeScreenContent
 import com.dmribeiro.zondatuner.presentation.ui.SplashScreenContent
 import com.dmribeiro.zondatuner.presentation.ui.TunerScreenContent
 import com.dmribeiro.zondatuner.presentation.viewmodel.HomeScreenModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.compose.koinInject
 import org.koin.mp.KoinPlatform
 
@@ -33,8 +36,23 @@ sealed class AppDestination : Screen {
             val navigator = LocalNavigator.currentOrThrow
 
             LaunchedEffect(Unit) {
-                delay(2000L)
-                navigator.replace(HomeScreen)
+                val getTunings: GetTuningsUseCase = KoinPlatform.getKoin().get()
+                val mapper: TuningDataUiMapper = KoinPlatform.getKoin().get()
+
+                // Splash de 1s; enquanto isso decide o destino.
+                val tunings = withTimeoutOrNull(800L) {
+                    getTunings().firstOrNull()
+                }.orEmpty()
+                delay(1000L)
+
+                val lastUsed = tunings.filter { it.lastUsedAt > 0 }.maxByOrNull { it.lastUsedAt }
+                if (lastUsed != null) {
+                    // Caso comum: abre direto no afinador, com a Home no back stack.
+                    navigator.replaceAll(HomeScreen)
+                    navigator.push(TunerScreen(mapper.toObject(lastUsed)))
+                } else {
+                    navigator.replace(HomeScreen)
+                }
             }
 
             SplashScreenContent()
@@ -57,7 +75,8 @@ sealed class AppDestination : Screen {
                     deleteTuningUseCase = KoinPlatform.getKoin().get(),
                     tuningDataUiMapper = KoinPlatform.getKoin().get(),
                     updateTuningUseCase = KoinPlatform.getKoin().get(),
-                    seedTuningsUseCase = KoinPlatform.getKoin().get()
+                    seedTuningsUseCase = KoinPlatform.getKoin().get(),
+                    markTuningUsedUseCase = KoinPlatform.getKoin().get(),
                 )
             }
 
@@ -102,7 +121,6 @@ sealed class AppDestination : Screen {
 
         override val key: String = "TunerScreenKey"
         override val topBarConfig = AppTopBarComponentState().apply {
-            title = tuning.name
             showBackButton = true
             showMenuButton = true
         }
@@ -110,24 +128,10 @@ sealed class AppDestination : Screen {
         @Composable
         override fun Content() {
             val navigator = LocalNavigator.current
-            val menuActions = LocalTopBarMenuActions.current
-            var deleteMenuClicked by remember { mutableStateOf(false) }
-
-            DisposableEffect(tuning) {
-                menuActions.onEdit = {
-                    navigator?.push(CreateTuningScreen(existingTuning = tuning))
-                }
-                menuActions.onDelete = { deleteMenuClicked = true }
-                onDispose {
-                    menuActions.clear()
-                }
-            }
 
             TunerScreenContent(
                 onBack = { navigator?.pop() },
                 tuning = tuning,
-                deleteMenuClicked = deleteMenuClicked,
-                onDeleteMenuHandled = { deleteMenuClicked = false }
             )
         }
     }

@@ -6,5 +6,6 @@ data class TuningDataUi(
     val id: Long,
     val name: String,
     val description: String,
-    val strings: List<GuitarString>
+    val strings: List<GuitarString>,
+    val lastUsedAt: Long = 0,
 )

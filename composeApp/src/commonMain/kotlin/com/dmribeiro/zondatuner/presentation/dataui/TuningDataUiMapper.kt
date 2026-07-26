@@ -19,7 +19,8 @@ class TuningDataUiMapper {
                 GuitarString(3, entity.string3Frequency, normalizeNote(entity.string3Note), entity.string3OctaveShift),
                 GuitarString(2, entity.string2Frequency, normalizeNote(entity.string2Note), entity.string2OctaveShift),
                 GuitarString(1, entity.string1Frequency, normalizeNote(entity.string1Note), entity.string1OctaveShift),
-            )
+            ),
+            lastUsedAt = entity.lastUsedAt,
         )
     }
 
@@ -61,7 +62,8 @@ class TuningDataUiMapper {
                     note = normalizeNote(guitarString.note),
                     octaveShift = guitarString.octaveShift
                 )
-            }
+            },
+            lastUsedAt = domainModel.lastUsedAt,
         )
     }
 
