@@ -1,8 +1,8 @@
 [versions]
-agp = "8.5.2"
-android-compileSdk = "34"
+agp = "8.9.1"
+android-compileSdk = "36"
 android-minSdk = "24"
-android-targetSdk = "34"
+android-targetSdk = "36"
 androidx-activityCompose = "1.9.3"
 androidx-appcompat = "1.7.0"
 androidx-constraintlayout = "2.2.0"
@@ -27,7 +27,7 @@ uiAndroid = "1.7.8"
 ui = "1.7.0"
 imageLoader = "1.2.10"
 roomVersion = "2.7.0-rc01"
-ksp = "2.0.21-1.0.27"
+ksp = "2.1.0-1.0.29"
 sqlite = "2.5.0-SNAPSHOT"
 
 

@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -11,13 +12,20 @@ plugins {
 }
 val korioVersion = "4.0.10"
 
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
 kotlin {
     androidTarget {
 
         tasks.withType<KotlinCompile> {
             compilerOptions {
                 freeCompilerArgs.add("-Xjsr305=strict")
-                jvmTarget.set(JvmTarget.JVM_11)
+                jvmTarget.set(JvmTarget.JVM_17)
             }
         }
     }
@@ -110,8 +118,18 @@ android {
         applicationId = "com.dmribeiro.zondatuner"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 6
+        versionName = "1.5"
+    }
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
     }
     packaging {
         resources {
@@ -121,11 +139,14 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
